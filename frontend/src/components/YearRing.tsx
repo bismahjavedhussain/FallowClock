@@ -334,8 +334,20 @@ export default function YearRing({
    * Returns null when nothing legal is within reach, so an impossible drop
    * still reaches placeDecision and the user gets told why.
    */
-  const snapTo = useCallback(
-    (day: number | null) => snapToNearestDay(day, highlightSet),
+  /**
+   * Snap for a drag, with no distance limit.
+   *
+   * snapTo gives up past SNAP_RADIUS_DAYS, which is right for a click --
+   * clicking 90 days from the only valid window is probably not a request
+   * to plant there. A drag is different: you are already holding the
+   * seed, the lit band is on screen, and the ghost arc shows the landing
+   * day the whole way. Refusing the drop at that point teaches nothing
+   * and just loses the gesture. DOY_LEN exceeds the largest possible
+   * circular distance (182), so this always resolves to a valid day when
+   * one exists.
+   */
+  const snapForDrag = useCallback(
+    (day: number | null) => snapToNearestDay(day, highlightSet, DOY_LEN),
     [highlightSet],
   )
 
@@ -381,14 +393,28 @@ export default function YearRing({
     [cx, cy],
   )
 
-  const dayAtClientPoint = useCallback((clientX: number, clientY: number): number | null => {
+  /**
+   * The day under a point, or null.
+   *
+   * `tolerant` widens this for dragging. Hovering wants a tight band --
+   * the readout should not jump to a day you are not pointing at -- but a
+   * DROP is a committed gesture, and asking for a landing inside a 40px
+   * annulus with a seed chip under the cursor is asking for pixel work.
+   * Tolerant mode accepts the whole wheel, centre disc included, because
+   * the only thing a drop needs from the pointer is an ANGLE, and the
+   * angle is well defined everywhere except the exact middle.
+   */
+  const dayAtClientPoint = useCallback((clientX: number, clientY: number, tolerant = false): number | null => {
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return null
     const scale = size / rect.width
     const x = (clientX - rect.left) * scale - cx
     const y = (clientY - rect.top) * scale - cy
     const dist = Math.hypot(x, y)
-    if (dist < rCoverInner * 0.85 || dist > rRiskMax * 1.08) return null
+    if (tolerant) {
+      // A dead spot at the pivot, where the angle is meaningless.
+      if (dist < size * 0.022) return null
+    } else if (dist < rCoverInner * 0.85 || dist > rRiskMax * 1.08) return null
     let angle = Math.atan2(x, -y)
     if (angle < 0) angle += Math.PI * 2
     return Math.min(DOY_LEN, Math.floor((angle / (Math.PI * 2)) * DOY_LEN) + 1)
@@ -558,17 +584,23 @@ export default function YearRing({
               // Native HTML5 drag does not fire onPointerMove, so this is the
               // only place a live position is available during a drag.
               e.preventDefault()
-              const snapped = snapTo(dayAtClientPoint(e.clientX, e.clientY))
+              // Tell the browser this is a valid drop, so the cursor shows
+              // the copy affordance instead of the "no entry" badge.
+              e.dataTransfer.dropEffect = 'copy'
+              // Same resolution the drop will use, so the ghost arc is a
+              // promise rather than a hint.
+              const snapped = snapForDrag(dayAtClientPoint(e.clientX, e.clientY, true))
               setDragDoy((prev) => (prev === snapped ? prev : snapped))
             }}
             onDragLeave={() => setDragDoy(null)}
             onDrop={(e) => {
               e.preventDefault()
               e.stopPropagation()
-              const raw = dayAtClientPoint(e.clientX, e.clientY)
-              // Prefer the snapped day; fall back to the raw one so an
-              // out-of-reach drop still produces a reason rather than silence.
-              const day = snapTo(raw) ?? raw
+              const raw = dayAtClientPoint(e.clientX, e.clientY, true)
+              // Prefer the snapped day; fall back to the raw one so a drop
+              // with no lit band at all still produces a reason rather
+              // than silence.
+              const day = snapForDrag(raw) ?? raw
               setDragDoy(null)
               if (day) { handleSelect(day); onActivateDay?.(day) }
             }}
@@ -767,12 +799,23 @@ export default function YearRing({
               />
             )}
 
-            {/* Centre Readout */}
+            {/* Centre Readout.
+                FOUR BASELINES, SPACED BY ARITHMETIC NOT BY EYE. SVG <text>
+                positions a BASELINE, so a line's real top is y - capHeight
+                (~0.70 of font size) and its bottom is y + descender (~0.21).
+                At the previous offsets the 0.105-size figure had its top at
+                -38.1 while the eyebrow's descender sat at -34.7: a gap of
+                MINUS 3.4, so "104" climbed through "ANNUAL CYCLE".
+                Current spacing, in units of `size`, leaves +15.8, +9.4 and
+                +11.6 between the four lines, and the widest line still
+                clears the disc edge by a wide margin -- the disc is r=158.7
+                at size 620 and the lowest line has 142.8 of half-width to
+                play with. Change one offset and re-check the others. */}
             <g textAnchor="middle" pointerEvents="none">
               <circle cx={cx} cy={cy} r={rCoverInner - size * 0.004} fill="#fbfff6" stroke="#cfe3c8" strokeWidth={1.5} />
               <text
                 x={cx}
-                y={cy - size * 0.06}
+                y={cy - size * 0.085}
                 fontSize={size * 0.019}
                 fontWeight={600}
                 className="fill-ink-soft uppercase tracking-wider"
@@ -781,7 +824,7 @@ export default function YearRing({
               </text>
               <text
                 x={cx}
-                y={cy + size * 0.012}
+                y={cy + size * 0.018}
                 fontSize={size * 0.105}
                 fontWeight={700}
                 className="fill-ink"
@@ -790,7 +833,7 @@ export default function YearRing({
               </text>
               <text
                 x={cx}
-                y={cy + size * 0.058}
+                y={cy + size * 0.072}
                 fontSize={size * 0.024}
                 fontWeight={500}
                 className="fill-ink-soft"
@@ -800,7 +843,7 @@ export default function YearRing({
               {longestGap && (
                 <text
                   x={cx}
-                  y={cy + size * 0.094}
+                  y={cy + size * 0.108}
                   fontSize={size * 0.0175}
                   className="fill-soil-bare font-medium"
                 >

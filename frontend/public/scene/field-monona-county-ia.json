@@ -16,5 +16,14 @@
     "y0": 0.4835080111999443,
     "y1": 0.5164919887999767
   },
-  "credit": "Contains modified Copernicus Sentinel data, processed by ESA."
+  "credit": "Contains modified Copernicus Sentinel data, processed by ESA.",
+  "false_colour": {
+    "file": "field-monona-county-ia-falsecolour.webp",
+    "bands": {
+      "red": "B08 (NIR 842nm)",
+      "green": "B04 (red 665nm)",
+      "blue": "B03 (green 560nm)"
+    },
+    "note": "Healthy canopy scatters near infrared, so vegetation reads red."
+  }
 }

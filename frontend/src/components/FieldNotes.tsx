@@ -12,7 +12,6 @@
  */
 
 import { useEffect, useRef } from 'react'
-import RingLegend from './RingLegend'
 import { sourceLines } from '../lib/sources'
 
 export interface FieldNotesData {
@@ -97,8 +96,7 @@ export default function FieldNotes({
           )}
 
           <section>
-            <h3>How to read the wheel</h3>
-            <RingLegend compact showDetails />
+            <h3>How the call is made</h3>
             <p className="notes-rule">
               <code>soil_cover</code> decides bare or covered. No observation stays unknown, never bare.
             </p>

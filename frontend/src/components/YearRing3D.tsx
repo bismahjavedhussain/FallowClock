@@ -6,6 +6,7 @@ import { createProceduralTree } from './seasonal/ProceduralTree'
 import { createAtmosphereDetails } from './seasonal/AtmosphereDetails'
 import { seasonWeights } from '../lib/seasons'
 import { DAYS_IN_RING, DAY_STEP, dayMatrix, wedgeGeometry } from './yearRing3dGeometry'
+import { snapToNearestDay } from './YearRing'
 
 export interface YearRing3DProps {
   soilCover: number[]
@@ -56,6 +57,10 @@ export function dayColor(cover: number, observations: number, target = new THREE
   return target.copy(coverLow).lerp(coverHigh, Math.max(0, Math.min(1, (cover - 0.3) / 0.7)))
 }
 
+/** The ring's plane, for resolving a drop that missed the wedges. */
+const GROUND_PLANE = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
+const groundHit = new THREE.Vector3()
+
 export function instanceIdToDoy(instanceId: number | undefined): number | null {
   return instanceId !== undefined && instanceId >= 0 && instanceId < DAYS_IN_RING ? instanceId + 1 : null
 }
@@ -78,22 +83,30 @@ function monthLabels(scene: THREE.Scene) {
     group.add(pin)
     geometries.push(pinGeo)
     materials.push(pinMat)
+    // 256x128, not 128x64. The sprite is drawn larger below, and a
+    // canvas texture does not resample kindly -- at the old resolution
+    // the bigger sprite would just be a blurrier small label. Doubling
+    // the surface and the type together keeps the edges crisp.
     const surface = document.createElement('canvas')
-    surface.width = 128; surface.height = 64
+    surface.width = 256; surface.height = 128
     const ctx = surface.getContext('2d')
     if (!ctx) return
     ctx.fillStyle = '#fffaf0'
-    ctx.beginPath(); ctx.roundRect(3, 3, 122, 58, 14); ctx.fill()
-    ctx.fillStyle = '#315142'
-    ctx.font = 'bold 28px system-ui'
+    ctx.beginPath(); ctx.roundRect(6, 6, 244, 116, 28); ctx.fill()
+    ctx.fillStyle = '#28473a'
+    ctx.font = 'bold 66px system-ui'
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
-    ctx.fillText(MONTH_NAMES[index], 64, 32)
+    ctx.fillText(MONTH_NAMES[index], 128, 66)
     const texture = new THREE.CanvasTexture(surface)
     texture.colorSpace = THREE.SRGBColorSpace
     const material = new THREE.SpriteMaterial({ map: texture, depthTest: false })
     const sprite = new THREE.Sprite(material)
-    sprite.position.set(x * 1.075, 0.55, z * 1.075)
-    sprite.scale.set(1.55, 0.77, 1)
+    // Pushed a little further out and up as well as enlarged, so the
+    // bigger chip does not crowd the ring's outer edge. Twelve labels on
+    // a circle of radius ~11.9 sit about 6.2 units apart; at 2.3 wide
+    // they stay clear of each other.
+    sprite.position.set(x * 1.09, 0.62, z * 1.09)
+    sprite.scale.set(2.3, 1.15, 1)
     group.add(sprite)
     textures.push(texture); materials.push(material)
   })
@@ -319,7 +332,25 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
     if (comparison.instanceColor) comparison.instanceColor.needsUpdate = true
   }, [compareCover, nObs, webglSupported])
 
-  const pickDay = useCallback((clientX: number, clientY: number): number | null => {
+  /**
+   * The day under a point, or null.
+   *
+   * `tolerant` is for dropping. Hovering and clicking raycast the ring
+   * mesh, which is right: you get the wedge you are actually pointing at
+   * or nothing. A DROP cannot work that way. The lit seeding window is
+   * about 48 wedges out of 365, each a couple of degrees wide on screen
+   * and tilted away from the camera, and the pointer is under a seed
+   * chip. Requiring a mesh hit there is asking for pixel work, which is
+   * why cereal rye would not drop.
+   *
+   * So when the mesh is missed, the ray is intersected with the ring's
+   * own plane instead and the angle read off that. The ring lies on
+   * y = 0 and instance `i` is rotated by -i * DAY_STEP about Y, which
+   * puts it at atan2(-x, z) -- so that angle inverts straight back to a
+   * day. The hole in the middle, the gap between wedges and the table
+   * around the ring all resolve to something sensible.
+   */
+  const pickDay = useCallback((clientX: number, clientY: number, tolerant = false): number | null => {
     const canvas = canvasRef.current
     const camera = cameraRef.current
     const ring = ringRef.current
@@ -329,7 +360,19 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
     pointerRef.current.set((clientX - rect.left) / rect.width * 2 - 1, -((clientY - rect.top) / rect.height * 2 - 1))
     camera.updateMatrixWorld()
     raycasterRef.current.setFromCamera(pointerRef.current, camera)
-    return instanceIdToDoy(raycasterRef.current.intersectObject(ring, false)[0]?.instanceId)
+    const hit = instanceIdToDoy(raycasterRef.current.intersectObject(ring, false)[0]?.instanceId)
+    if (hit !== null || !tolerant) return hit
+
+    // Missed the wedges. Fall back to where the ray crosses the ring's
+    // plane. Null when the camera is edge-on and the ray never meets it.
+    if (!raycasterRef.current.ray.intersectPlane(GROUND_PLANE, groundHit)) return null
+    const radius = Math.hypot(groundHit.x, groundHit.z)
+    // A dead spot on the axis, where the angle means nothing, and a
+    // ceiling so a drop way off in the scene is not read as a date.
+    if (radius < 1.2 || radius > 26) return null
+    let angle = Math.atan2(-groundHit.x, groundHit.z)
+    if (angle < 0) angle += Math.PI * 2
+    return (Math.floor(angle / DAY_STEP) % DAYS_IN_RING) + 1
   }, [])
 
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -385,7 +428,27 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
   )
 
   if (!webglSupported) return <div className="flex h-full flex-col items-center justify-center p-8 text-center text-ink-soft"><p className="font-semibold text-risk-high">3D graphics are unavailable in this browser.</p><p className="mt-1 text-sm">Use the 2D Year Ring to continue.</p></div>
-  return <div ref={containerRef} className="relative h-full w-full overflow-hidden rounded-xl border border-black/10 bg-paper" style={{ touchAction: 'none' }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onLostPointerCapture={() => { dragRef.current.active = false }} onPointerLeave={() => { if (!dragRef.current.active && lastHoverRef.current !== null) { lastHoverRef.current = null; onHoverDay?.(null) } }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const doy = pickDay(event.clientX, event.clientY); if (doy) { onSelectDay?.(doy); onActivateDay?.(doy) } }} role="region" aria-label="3D Year Ring Interactive Calendar">
+  return <div ref={containerRef} className="relative h-full w-full overflow-hidden rounded-xl border border-black/10 bg-paper" style={{ touchAction: 'none' }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onLostPointerCapture={() => { dragRef.current.active = false }} onPointerLeave={() => { if (!dragRef.current.active && lastHoverRef.current !== null) { lastHoverRef.current = null; onHoverDay?.(null) } }} onDragOver={(event) => {
+      event.preventDefault()
+      // Say the drop is allowed, so the cursor stops showing "no entry".
+      event.dataTransfer.dropEffect = 'copy'
+    }} onDrop={(event) => {
+      event.preventDefault()
+      const raw = pickDay(event.clientX, event.clientY, true)
+      // DAYS_IN_RING as the snap radius means no limit -- the largest
+      // circular distance is half a year. The lit band is on screen and
+      // the user is holding the seed; refusing the drop at this point
+      // teaches nothing and just loses the gesture.
+      const doy = snapToNearestDay(raw, highlightSet.size ? highlightSet : null, DAYS_IN_RING) ?? raw
+      if (doy) {
+        // Only swallow the event once it has actually been handled. A
+        // drop we cannot resolve must bubble to the field panel, which
+        // plants on the suggested date rather than losing the drag.
+        event.stopPropagation()
+        onSelectDay?.(doy)
+        onActivateDay?.(doy)
+      }
+    }} role="region" aria-label="3D Year Ring Interactive Calendar">
     <canvas ref={canvasRef} className="block h-full w-full cursor-grab active:cursor-grabbing" />
     {/* Bottom-left: top-left is the day tooltip, top-centre the phase pills, bottom-right Reset camera. */}
     <div className="pointer-events-none absolute bottom-3 left-3 max-w-[48%] rounded-md bg-white/85 px-2 py-1 text-[11px] font-medium text-ink-soft backdrop-blur">Drag to orbit · scroll to zoom · click a day</div>

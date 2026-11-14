@@ -16,5 +16,14 @@
     "y0": 0.4655157403999651,
     "y1": 0.5344842595999559
   },
-  "credit": "Contains modified Copernicus Sentinel data, processed by ESA."
+  "credit": "Contains modified Copernicus Sentinel data, processed by ESA.",
+  "false_colour": {
+    "file": "field-story-county-ia-falsecolour.webp",
+    "bands": {
+      "red": "B08 (NIR 842nm)",
+      "green": "B04 (red 665nm)",
+      "blue": "B03 (green 560nm)"
+    },
+    "note": "Healthy canopy scatters near infrared, so vegetation reads red."
+  }
 }

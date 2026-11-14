@@ -1460,3 +1460,274 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 
 /* Same for the 3D stage, which otherwise inherits the same squeeze. */
 .hero-world .year-ring-stage-3d { min-height: 0; }
+
+
+/* ======================================================================
+   ORBITAL BACKDROP -- THE TITLE CARD ONLY
+   ----------------------------------------------------------------------
+   North America at night, from NASA GIBS layer VIIRS_Black_Marble: the
+   Suomi-NPP Day/Night Band composite. 18-56 N, 129-61 W, so Iowa sits
+   near the centre of that dense Midwest grid -- the field this tool
+   analyses is somewhere in those lights.
+
+   IT IS A NASA IMAGE, which is why it can carry the title card without
+   a caption. Sentinel-2 is ESA and has to be labelled as such wherever
+   it appears; Black Marble does not create that obligation.
+
+   IT STOPS AT THE GATE. The four acts stay one flat colour behind their
+   cards. A photograph under a working instrument competes with the
+   figures sitting on it, and every chart, cutaway and dial here has to
+   be read, not admired. The title card is the one screen with nothing to
+   read, so it is the one screen that can carry an image. The gate is
+   conditionally rendered, so clicking Begin UNMOUNTS this entirely --
+   the image leaves the DOM rather than being hidden.
+   ====================================================================== */
+
+/* --- the acts: one flat colour -------------------------------------- */
+/* ONE COLOUR, NOT A WASH. Setting the shell background was not enough:
+   .site-shell::before paints a cream radial glow over the whole viewport
+   (line 94, redefined at 325 for the photographic theme), and
+   [data-season="winter"] re-tints background-color on top of that. Both
+   were designed for the old pale page and both have to be switched off
+   here, or the "flat" colour arrives with a bright patch at top-left
+   that moves with the season. */
+/* One token, so the page colour is changed in one place. */
+:root { --deck-bg: #061710; --deck-edge: #15332a; }
+
+body { background: var(--deck-bg); }
+.site-shell.is-deck,
+.site-shell.is-deck[data-season] { background: var(--deck-bg); }
+.site-shell.is-deck::before { content: none; }
+/* The act bar at the foot of the deck faded to cream (line 890), which
+   read as a white gradient across the bottom of every act. Its pills,
+   arrow and Next button all carry their own backgrounds, so the bar
+   itself can simply be the page colour. */
+.site-shell.is-deck .deck-nav { background: var(--deck-bg); border-top-color: var(--deck-edge); }
+
+/* The act pills were a 68%-white chip with grey-green text, which worked
+   on the old cream bar. Over the dark page that chip composites to a mid
+   grey and the label drops to 2.56:1 -- below AA, and the pills are the
+   deck's primary navigation. Translucent dark with a light label instead:
+   9.1:1, and it reads as glass rather than a sticker. No backdrop-filter;
+   the page behind is one flat colour, so a blur would cost GPU time and
+   change nothing. */
+.site-shell.is-deck .deck-nav ol button { background: #ffffff24; border-color: #ffffff2b; color: #cfe3d4; }
+.site-shell.is-deck .deck-nav ol button:hover { background: #ffffff3b; border-color: #ffffff5c; }
+.site-shell.is-deck .deck-nav ol button.is-on { background: #2f6b52; border-color: #58a583; color: #f3faf1; }
+.site-shell.is-deck .deck-arrow { background: #ffffff1f; border-color: #ffffff3b; color: #dcebe1; }
+.site-shell.is-deck .deck-arrow:hover:not(:disabled) { background: #ffffff38; }
+
+/* --- the title card ------------------------------------------------- */
+.enter-gate { background: #07180f; isolation: isolate; }
+
+.enter-gate::before {
+  content: '';
+  position: absolute;
+  /* Blur samples past the element's edge and would leave a pale rim, so
+     the layer is inset negatively and scaled to push that rim off-screen. */
+  inset: -3%;
+  z-index: 0;
+  pointer-events: none;
+  background-image: url('/scene/night-lights-north-america.webp');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  /* The brief asked for backdrop-filter: blur(4px). Two changes, both
+     deliberate. A static full-screen backdrop-filter recomposites every
+     frame, so the blur goes on the image layer instead -- identical
+     result, free after first paint. And it is 2px, not 4: the city
+     lights ARE the picture, and at 4px the Midwest grid smears into a
+     wash. At 2px they bloom instead, which is the look anyway. */
+  filter: blur(2px) saturate(1.06) brightness(1.08);
+  transform: scale(1.06);
+  /* A very slow drift, so the view reads as orbital rather than as a
+     still. 90s, a few percent of travel -- noticeable only if you look. */
+  animation: orbital-drift 90s ease-in-out infinite alternate;
+}
+
+@keyframes orbital-drift {
+  from { transform: scale(1.06) translate3d(-1.1%, 0.5%, 0); }
+  to   { transform: scale(1.11) translate3d(1.1%, -0.5%, 0); }
+}
+
+.enter-gate::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  /* Navy-to-emerald, over a vignette that keeps the edges dark. The
+     diagonal carries the emerald corner into the header's own green so
+     the two do not read as separate palettes, and the navy corner is
+     what makes it feel like telemetry rather than a field photo. */
+  background:
+    radial-gradient(ellipse at 50% 42%,
+      rgba(6, 18, 14, .30) 0%,
+      rgba(5, 14, 12, .62) 62%,
+      rgba(3, 9, 8, .86) 100%),
+    linear-gradient(135deg,
+      rgba(10, 26, 20, .85) 0%,
+      rgba(10, 22, 38, .90) 100%);
+}
+
+/* Above both layers. Named elements only -- a `> *` rule here would
+   overwrite `position` on children that set their own, which is exactly
+   what broke the gate once already. */
+.enter-gate .enter-card { position: relative; z-index: 3; }
+
+/* --- the telemetry constellation -------------------------------------
+   Layer order inside the gate: ::before the imagery, ::after the tint,
+   this mesh, then the card. The mesh goes ABOVE the tint on purpose --
+   under it the lines would be dimmed twice and vanish at these opacities.
+
+   Nothing here runs in JavaScript. The geometry is solved once at mount
+   (lib/telemetryMesh.ts) and every moving part below is CSS, so the
+   landing screen stays free for the narration and the audio graph.
+   ---------------------------------------------------------------------- */
+.telemetry-mesh {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  /* The ceiling on the whole effect. Everything inside is relative to
+     this, so the mesh can never outshine the title or the button. */
+  opacity: .3;
+  animation: tm-drift 120s ease-in-out infinite alternate;
+}
+
+/* One transform on the group keeps every line attached to its dots. */
+@keyframes tm-drift {
+  from { transform: translate3d(-1.4%, 0.8%, 0) scale(1.03); }
+  to   { transform: translate3d(1.4%, -0.8%, 0) scale(1.07); }
+}
+
+.tm-edges line {
+  stroke: #5fe3c4;
+  stroke-width: 1.1;
+  animation: tm-line 11s ease-in-out infinite;
+}
+@keyframes tm-line {
+  0%, 100% { opacity: .55; }
+  50%      { opacity: 1; }
+}
+
+.tm-dot { fill: #b9f6e2; }
+.tm-nodes g {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: tm-pulse 9s ease-in-out infinite;
+}
+@keyframes tm-pulse {
+  0%, 100% { opacity: .5;  transform: scale(.82); }
+  50%      { opacity: 1;   transform: scale(1.14); }
+}
+
+/* Phones get a quieter mesh: the same node count over a narrower frame
+   is visually denser, and the title has less room to breathe. */
+@media (max-width: 760px) {
+  .telemetry-mesh { opacity: .2; }
+}
+
+/* Decorative and constantly moving -- exactly what this setting is for.
+   The mesh stays, so the composition is unchanged; it simply stops. */
+@media (prefers-reduced-motion: reduce) {
+  .telemetry-mesh,
+  .tm-edges line,
+  .tm-nodes g { animation: none; }
+  .telemetry-mesh { opacity: .22; }
+}
+
+/* --- text with no card of its own ------------------------------------ */
+/* These lines were dark grey on the old cream page. On the dark acts
+   they need to be light or they disappear. */
+.site-shell.is-deck .act-head p { color: #cfe3d4; }
+.site-shell.is-deck .ring-caption { color: #bed4c5; }
+.site-shell.is-deck .phase-caption { border-top-color: #ffffff2e; color: #aec6b4; }
+.site-shell.is-deck .lush-meter small { color: #bcd3c2; }
+
+/* Hold the imagery, drop the blur so the texture stops reading as
+   motion behind the title. */
+@media (prefers-reduced-motion: reduce) {
+  .enter-gate::before { animation: none; filter: none; transform: none; inset: 0; opacity: .75; }
+}
+
+
+/* --- the header spans the window ------------------------------------- */
+/* .topbar carries `margin: auto` from line 104, for the old centred page
+   that had a 1340px column. In the deck the shell is a flex COLUMN, so
+   that auto margin acts on the cross axis: combined with `flex: none` it
+   collapsed the bar to its content width and centred it, leaving dark
+   gutters either side. Stretching it is the fix; the padding inside still
+   keeps the content off the glass. */
+.site-shell.is-deck .topbar { width: 100%; max-width: none; margin: 0; align-self: stretch; }
+
+/* --- Field notes was unreadable -------------------------------------- */
+/* `.notes-trigger { color: inherit }` inherits #2d4038 from .site-shell --
+   written for the old cream page. On the dark green bar that is dark text
+   on a dark bar; only the amber count was visible. */
+.site-shell.is-deck .notes-trigger { color: #eaf6ef; font: 600 12px/1 system-ui; letter-spacing: .01em; }
+.site-shell.is-deck .notes-trigger:hover { color: #ffffff; }
+
+
+/* --- the header's three controls sit on one line --------------------- */
+/* .farm-switch carries `margin-top: 8px` (line 474) from the old stacked
+   header. In a flex row with align-items:center that margin just shifts
+   it down, which is what made Field notes look raised next to it.
+   With the margin gone, the three are given the same OUTER height --
+   38px including borders -- so the row reads as one control set:
+     farm switch   3px padding + 30px button + 2px border = 38
+     field notes   36px min-height + 2px border           = 38
+     sound         36px box      + 2px border             = 38  */
+.site-shell.is-deck .farm-switch { margin-top: 0; align-self: center; }
+.site-shell.is-deck .farm-switch button { min-height: 30px; }
+.site-shell.is-deck .notes-trigger { min-height: 36px; align-self: center; }
+.site-shell.is-deck .sound-toggle { align-self: center; }
+
+
+/* --- carrying a seed -------------------------------------------------- */
+/* The cursor itself is set per packet in CropPlanner (lib/seedCursor.ts),
+   because the tint changes with the packet. These rules cover the drag
+   chip and the states the cursor cannot express. */
+
+/* The node setDragImage snapshots. It must be rendered, so it cannot be
+   display:none or off the compositor -- parked off-screen instead, which
+   is the one approach Chrome, Firefox and Safari all screenshot
+   correctly. */
+.seed-ghost {
+  position: fixed;
+  top: -400px;
+  left: -400px;
+  z-index: -1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px 7px 9px;
+  border: 2px solid #9db79f;
+  border-radius: 999px;
+  background: #fffaf0;
+  box-shadow: 0 6px 18px #1d33221f;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.seed-ghost svg { flex: none; display: block; }
+.seed-ghost strong { font: 700 13px/1 system-ui; color: #2f4a3a; }
+
+/* Mid-drag the packet stays lifted, so it is obvious which one is in hand. */
+.seed-packet:active { transform: translateY(-3px) scale(.985); }
+
+/* A packet with no feasible fit is not draggable in spirit; say so. */
+.seed-packet.infeasible { cursor: not-allowed; }
+
+/* The wheel is the target, so it reads as a place to let go. */
+.year-ring-stage-2d svg, .year-ring-stage-3d canvas { cursor: crosshair; }
+.year-ring-stage-3d canvas { cursor: grab; }
+
+
+/* --- the seed in the packet ------------------------------------------ */
+/* Was a Georgia dingbat at 35px, cycled over four flowers. Now the
+   species' own seed, so cereal rye and buckwheat are told apart by shape
+   rather than by where they happened to land in the grid. */
+.seed-art { display: block; margin-bottom: 7px; line-height: 0; }
+.seed-art .seed-icon { display: block; }

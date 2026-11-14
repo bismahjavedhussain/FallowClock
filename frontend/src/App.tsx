@@ -22,6 +22,7 @@ import FarmerDiary from './components/FarmerDiary'
 import FarmerThinking from './components/FarmerThinking'
 import FieldDiaryModal from './components/FieldDiaryModal'
 import LegendFlyout from './components/LegendFlyout'
+import TelemetryMesh from './components/TelemetryMesh'
 import { buildInsights, thinkingLines } from './lib/insights'
 import type { DiaryEntry } from './components/FarmerDiary'
 import { buildActs, gapHeadline } from './lib/acts'
@@ -495,7 +496,13 @@ export default function App() {
   ]
   const actCopy = acts[slide] ?? acts[0]
 
-  return <div className="site-shell is-deck" data-season={seasonAtDoy(selectedDoy)} data-act={SLIDES[slide]?.id} id="top">
+  return <div
+    className="site-shell is-deck"
+    data-season={seasonAtDoy(selectedDoy)}
+    data-act={SLIDES[slide]?.id}
+    id="top"
+  >
+
     {bundle.provenance.is_synthetic && <div className="fixture-banner" role="status"><span>&#10035;</span> SYNTHETIC SAMPLE &mdash; simulated soil cover; no satellite observations. <span>&#10035;</span></div>}
 
     <header className="topbar" aria-label="Fallow Clock">
@@ -508,6 +515,7 @@ export default function App() {
 
     {!entered && (
       <div className="enter-gate" role="dialog" aria-label="Start Fallow Clock">
+        <TelemetryMesh />
         <div className="enter-card">
           <span className="eyebrow">NASA Space Apps 2026 &middot; Field Shift</span>
           <h1>Fallow Clock</h1>
@@ -547,7 +555,18 @@ export default function App() {
       <div className="act-pane pane-crisis">
         <div className="pane-grid">
           <div className="pane-main">
-            <div className="hero-world" data-season={seasonAtDoy(selectedDoy)} data-mode={mode} data-lush={lush > 0.02 ? 'on' : 'off'} style={{ ['--lush' as string]: lush.toFixed(3) }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); setPlacementMessage('Drop the packet onto a day on the wheel, or use the suggested date button.') }}>
+            <div className="hero-world" data-season={seasonAtDoy(selectedDoy)} data-mode={mode} data-lush={lush > 0.02 ? 'on' : 'off'} style={{ ['--lush' as string]: lush.toFixed(3) }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => {
+              e.preventDefault()
+              // Caught a drop that missed the wheel entirely -- the gap
+              // between the panel edge and the ring, or the scene behind
+              // it. Rather than scold, plant on the suggested date: the
+              // user asked for this crop by dragging it here, and the
+              // suggested day is the one the model would pick anyway.
+              const id = e.dataTransfer.getData('text/plain') || draggingSpeciesId
+              const fit = id ? fitById.get(id) : undefined
+              if (fit?.feasible) placeCrop(fit.seedDoy, id!)
+              else setPlacementMessage('That crop has no feasible fit on this field.')
+            }}>
               <Suspense fallback={null}><SeasonalWorld doy={selectedDoy} storm={storm} /></Suspense>
               {phaseCovers && phaseLabels && phaseCovers.length === phaseLabels.length && current.bare_days_by_phase && (
                 <PhaseToggle
