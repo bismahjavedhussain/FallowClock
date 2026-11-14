@@ -93,8 +93,8 @@ export function buildActs(input: ActInput): Act[] {
       eyebrow: 'Act two',
       title: 'Not every year is the same',
       line: phases
-        ? `After corn and after soybeans this is a different field: ${phases}. The wheel shows their average — a curve no real year followed.`
-        : 'The wheel shows the average year. Scrub it and watch where the cover goes.',
+        ? `This field changes with the crop before it: ${phases}. The chart below shows each crop phase and their average. That average is a summary, not a year the field actually lived through.`
+        : 'The chart below shows the average soil cover across the year. Move the date slider to inspect each day.',
       focus: 'farmer',
       anchor: 'year',
     },

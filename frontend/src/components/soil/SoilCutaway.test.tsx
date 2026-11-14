@@ -63,8 +63,8 @@ describe('SoilCutaway', () => {
   it('drops labels in the compact variant used by the 3-up', () => {
     const full = renderToStaticMarkup(<SoilCutaway doy={200} {...base} />)
     const compact = renderToStaticMarkup(<SoilCutaway doy={200} {...base} variant="compact" />)
-    expect(full).toContain('TOPSOIL')
-    expect(compact).not.toContain('TOPSOIL')
+    expect(full).toContain('>Topsoil</span>')
+    expect(compact).not.toContain('>Topsoil</span>')
   })
 })
 
@@ -88,7 +88,7 @@ describe('SplitCore', () => {
 
   it('renders one panel per scenario with its metrics', () => {
     const html = renderToStaticMarkup(<SplitCore {...props} />)
-    expect((html.match(/class="split-panel/g) ?? []).length).toBe(3)
+    expect((html.match(/<article class="split-panel/g) ?? []).length).toBe(3)
     expect(html).toContain('$62/ha')
     expect(html).toContain('-27%')
     expect(html).toContain('112 after soybean')
@@ -103,7 +103,7 @@ describe('SplitCore', () => {
   it('gives the alternatives different roots from the baseline', () => {
     // If every panel grew identical roots the comparison would be a lie.
     const html = renderToStaticMarkup(<SplitCore {...props} />)
-    const panels = html.split('class="split-panel').slice(1)
+    const panels = html.split('<article class="split-panel').slice(1)
     const paths = panels.map((p) => (p.match(/<path /g) ?? []).length)
     expect(paths[1]).not.toBe(paths[0])
   })

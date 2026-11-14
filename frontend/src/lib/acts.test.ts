@@ -107,7 +107,7 @@ describe('buildActs', () => {
 
   it('falls back cleanly when a field has no phases', () => {
     const acts = buildActs({ ...story, bareDaysByPhase: null, phaseLabels: null })
-    expect(acts[1].line).toContain('average year')
+    expect(acts[1].line).toContain('average soil cover')
   })
 
   it('never hardcodes a number: changing the bundle changes the story', () => {

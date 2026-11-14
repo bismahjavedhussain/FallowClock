@@ -49,6 +49,7 @@ export interface SoilCutawayProps {
 }
 
 const W = 420
+const FULL_W = 700
 const H = 300
 const SURFACE_Y = 96
 
@@ -94,14 +95,15 @@ export default function SoilCutaway({
   className = '',
 }: SoilCutawayProps) {
   const compact = variant === 'compact'
+  const width = compact ? W : FULL_W
 
   // Generated once. `doy` is deliberately NOT a dependency -- the whole point
   // is that scrubbing changes attributes, never geometry.
   const roots = useMemo(
-    () => buildRootSystem({ width: W, height: H, surfaceY: SURFACE_Y, seed, plants: compact ? 3 : 4 }),
-    [seed, compact],
+    () => buildRootSystem({ width, height: H, surfaceY: SURFACE_Y, seed, plants: compact ? 3 : 6 }),
+    [seed, compact, width],
   )
-  const flecks = useMemo(() => buildFleckPool(seed + 11, compact ? 8 : 16, W), [seed, compact])
+  const flecks = useMemo(() => buildFleckPool(seed + 11, compact ? 8 : 24, width), [seed, compact, width])
   const rMax = useMemo(
     () => erosivityMax ?? Math.max(...erosivity, 0),
     [erosivityMax, erosivity],
@@ -116,6 +118,7 @@ export default function SoilCutaway({
   const unknown = obs <= 0
 
   const erosion = erosionIntensity(cover, r, rMax, obs)
+  const status = unknown ? 'Cover unknown today' : erosion > 0.02 ? 'Topsoil at risk today' : cover < 0.3 ? 'Bare soil today' : 'Soil protected today'
 
   // Residue sits ON the surface, so it grows upward from the ground line.
   const matH = 3 + residue * 20
@@ -131,11 +134,15 @@ export default function SoilCutaway({
 
   return (
     <figure className={`soil-cutaway ${compact ? 'is-compact' : ''} ${className}`} data-unknown={unknown ? 'on' : 'off'}>
+      {!compact && <div className="soil-scene-head">
+        <div><span className="eyebrow">Field profile</span><strong>Under the surface</strong></div>
+        <span className={`soil-scene-status ${erosion > 0.02 ? 'is-at-risk' : ''}`}>{status}</span>
+      </div>}
       <svg
-        viewBox={`0 0 ${W} ${H}`}
+        viewBox={`0 0 ${width} ${H}`}
         role="img"
         aria-labelledby={`${uid}-t ${uid}-d`}
-        preserveAspectRatio="xMidYMid meet"
+        preserveAspectRatio="none"
       >
         <title id={`${uid}-t`}>{label ? `Soil profile — ${label}` : 'Soil profile'}</title>
         <desc id={`${uid}-d`}>{desc}</desc>
@@ -152,21 +159,21 @@ export default function SoilCutaway({
             <feBlend in="SourceGraphic" in2="speck" mode="multiply" />
           </filter>
           <clipPath id={`${uid}-soil`}>
-            <rect x="0" y={SURFACE_Y} width={W} height={H - SURFACE_Y} />
+            <rect x="0" y={SURFACE_Y} width={width} height={H - SURFACE_Y} />
           </clipPath>
         </defs>
 
         {/* ---- sky above the ground line ---- */}
-        <rect x="0" y="0" width={W} height={SURFACE_Y} fill="transparent" />
+        <rect x="0" y="0" width={width} height={SURFACE_Y} fill="transparent" />
 
         <g clipPath={`url(#${uid}-soil)`}>
           {/* ---- parent material, subsoil, topsoil ---- */}
-          <rect x="0" y={H - 46} width={W} height="46" fill={PARENT} />
-          <rect x="0" y={H - 118} width={W} height="72" fill={SUBSOIL} />
+          <rect x="0" y={H - 46} width={width} height="46" fill={PARENT} />
+          <rect x="0" y={H - 118} width={width} height="72" fill={SUBSOIL} />
           <rect
             x="0"
             y={SURFACE_Y}
-            width={W}
+            width={width}
             height={H - SURFACE_Y - 118}
             fill={unknown ? '#8e8c86' : mix(SOIL_DRY, SOIL_WET, moisture)}
             filter={`url(#${uid}-grain)`}
@@ -177,7 +184,7 @@ export default function SoilCutaway({
           <rect
             x="0"
             y={waterY}
-            width={W}
+            width={width}
             height={Math.max(0, H - waterY)}
             fill={WATER}
             opacity={unknown ? 0.06 : 0.3}
@@ -185,7 +192,7 @@ export default function SoilCutaway({
           />
           <line
             x1="0"
-            x2={W}
+            x2={width}
             y1={waterY}
             y2={waterY}
             stroke={WATER}
@@ -217,13 +224,13 @@ export default function SoilCutaway({
         </g>
 
         {/* ---- the ground line ---- */}
-        <line x1="0" x2={W} y1={SURFACE_Y} y2={SURFACE_Y} stroke="#2f2317" strokeWidth="1.5" opacity=".5" />
+        <line x1="0" x2={width} y1={SURFACE_Y} y2={SURFACE_Y} stroke="#2f2317" strokeWidth="1.5" opacity=".5" />
 
         {/* ---- residue mat, sitting on top ---- */}
         <rect
           x="0"
           y={SURFACE_Y - matH}
-          width={W}
+          width={width}
           height={matH}
           fill={unknown ? '#a9a59c' : RESIDUE}
           opacity={unknown ? 0.3 : 0.55 + residue * 0.35}
@@ -254,21 +261,14 @@ export default function SoilCutaway({
           ))}
         </g>
 
-        {/* ---- labels ---- */}
-        {!compact && (
-          <g className="soil-labels" aria-hidden="true">
-            <text x="10" y={SURFACE_Y - matH - 8}>RESIDUE {Math.round(residue * 100)}%</text>
-            <text x="10" y={SURFACE_Y + 22}>TOPSOIL</text>
-            <text x="10" y={H - 126}>SUBSOIL</text>
-            <text x={W - 10} y={waterY - 6} textAnchor="end" className="soil-label-water">
-              WATER {Math.round(moisture * 100)}% · MODELLED
-            </text>
-            <text x={W - 10} y={SURFACE_Y + 22} textAnchor="end">
-              ROOTS · DERIVED
-            </text>
-          </g>
-        )}
       </svg>
+      {!compact && <div className="soil-scene-labels" aria-hidden="true">
+        <span className="soil-scene-residue" style={{ top: `${((SURFACE_Y - matH) / H) * 100}%` }}>Residue {Math.round(residue * 100)}%</span>
+        <span className="soil-scene-topsoil">Topsoil</span>
+        <span className="soil-scene-roots">Roots · derived</span>
+        <span className="soil-scene-subsoil">Subsoil</span>
+        <span className="soil-scene-water" style={{ top: `${(waterY / H) * 100}%` }}>Water {Math.round(moisture * 100)}% · modelled</span>
+      </div>}
     </figure>
   )
 }
