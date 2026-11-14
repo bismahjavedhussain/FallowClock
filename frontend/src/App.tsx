@@ -1,20 +1,35 @@
 /** Seasonal application shell. Scientific values always come from the bundle. */
 
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import YearRing from './components/YearRing'
 import RingLegend from './components/RingLegend'
 import TimeLever from './components/TimeLever'
 import CropPlanner from './components/CropPlanner'
 import AudioAtmosphere from './components/seasonal/AudioAtmosphere'
 import AtmosphereReadout from './components/seasonal/AtmosphereReadout'
-import { PRE_GAP_SEEDING_DAYS, RUSLE_B_DEFAULT, candidateSeedDoys, rankSpeciesForGap } from './lib/cropFit'
+import FarmerGuide from './components/FarmerGuide'
+import FieldNotes from './components/FieldNotes'
+import SoilCutaway from './components/soil/SoilCutaway'
+import SplitCore from './components/soil/SplitCore'
+import SlideDeck from './components/SlideDeck'
+import SatelliteIntro from './components/SatelliteIntro'
+import FarmerIntro from './components/FarmerIntro'
+import { buildIntroBeats } from './lib/intro'
+import FarmerDiary from './components/FarmerDiary'
+import type { DiaryEntry } from './components/FarmerDiary'
+import { buildActs, gapHeadline } from './lib/acts'
+import { guideLine } from './lib/guide'
+import type { GuideContext } from './lib/guide'
+import { playChime, playDeny, playSeedDrop, playSwitch, playTick, primeOnFirstGesture, setSoundEnabled as setEngineSound } from './lib/sound'
+import { PRE_GAP_SEEDING_DAYS, RUSLE_B_DEFAULT, candidateSeedDoys, rankSpeciesForGap, spliceRotationCover } from './lib/cropFit'
 import { placeDecision, proposalPreview } from './lib/proposal'
 import type { ClimatologySlice, Gap, Species } from './lib/cropFit'
 import { useStore } from './store'
 import { seasonAtDoy } from './lib/seasons'
+import { fieldMode } from './lib/atmosphere'
 import { doyToDate } from './components/YearRing'
 
-const SeasonalWorld = lazy(() => import('./components/seasonal/SeasonalWorld'))
+const ParallaxField = lazy(() => import('./components/seasonal/ParallaxField'))
 
 interface Rotation {
   id: string
@@ -81,7 +96,39 @@ export default function App() {
   const { selectedRotationId, selectRotation, hoveredDoy, setHoveredDoy, selectedDoy, setSelectedDoy, draggingSpeciesId, setDraggingSpecies, placedFills, addPlacedFill, removePlacedFill, resetPlacedFills, reducedMotion, setReducedMotion } = useStore()
   const [mode, setMode] = useState<'2D' | '3D'>('3D')
   const [farmId, setFarmId] = useState<string>(FARMS[0].id)
+  const [notesOpen, setNotesOpen] = useState(false)
+  const [slide, setSlide] = useState(0)
+  const [entered, setEntered] = useState(false)
+  const [introDone, setIntroDone] = useState(false)
+  const [briefDone, setBriefDone] = useState(false)
+  const finishSatellite = useCallback(() => setIntroDone(true), [])
+  const finishBrief = useCallback(() => setBriefDone(true), [])
+  const setAudioStage = useStore((st) => st.setAudioStage)
+
+  useEffect(() => {
+    // Narration alone over the descent; a faded bed under the brief; the
+    // full atmosphere once the tool is in the user's hands.
+    setAudioStage(!introDone ? 'intro' : !briefDone ? 'brief' : 'tool')
+  }, [introDone, briefDone, setAudioStage])
+  const [storm, setStorm] = useState(0)
+  const [diary, setDiary] = useState<DiaryEntry[]>([])
+  const [writing, setWriting] = useState(false)
+  const writeTimer = useRef(0)
+  const stormTimers = useRef<number[]>([])
+  // What the farmer should react to. Cleared after a few seconds so the
+  // bubble falls back to describing whatever day you are standing on.
+  const [guideEvent, setGuideEvent] = useState<{ type: GuideContext['event']; detail?: string; nonce: number }>({ type: 'idle', nonce: 0 })
+
+  useEffect(() => {
+    if (guideEvent.type === 'idle') return
+    const t = window.setTimeout(() => setGuideEvent({ type: 'idle', nonce: 0 }), 4200)
+    return () => window.clearTimeout(t)
+  }, [guideEvent])
   const [placementMessage, setPlacementMessage] = useState<string | null>(null)
+
+  // Audio is on from the start, but a context made before any gesture is
+  // born suspended. Prime it so the first click anywhere wakes it.
+  useEffect(() => { primeOnFirstGesture() }, [])
 
   useEffect(() => {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -118,6 +165,13 @@ export default function App() {
     }
   }, [farmId])
 
+  useEffect(() => {
+    setGuideEvent({ type: 'farm', nonce: Date.now() })
+    setIntroDone(false)
+    setBriefDone(false)
+    setSlide(0)
+  }, [farmId])
+
   const clim = bundle?.climatology
   const current = bundle?.rotations.find((r) => r.is_current)
   const selected =
@@ -137,6 +191,28 @@ export default function App() {
 
   const phaseLabels = bundle?.observed_rotation?.phase_labels ?? null
   const phaseCovers = bundle?.climatology?.phase_covers ?? null
+
+  // The worst single day in 25 years of NASA POWER rainfall. The storm
+  // button jumps here rather than inventing weather: the point is to show
+  // how each rotation handles a storm this field has really had.
+  const worstStormDoy = useMemo(() => {
+    const r = clim?.erosivity_r
+    if (!r?.length) return 1
+    let best = -Infinity
+    let idx = 0
+    r.forEach((v, i) => {
+      if (v > best) {
+        best = v
+        idx = i
+      }
+    })
+    return idx + 1
+  }, [clim])
+
+  useEffect(() => () => {
+    stormTimers.current.forEach((t) => window.clearTimeout(t))
+    window.clearTimeout(writeTimer.current)
+  }, [])
 
   const slice: ClimatologySlice | null = useMemo(
     () =>
@@ -188,32 +264,74 @@ export default function App() {
           .join(', ')
       : null
 
-  // The two headline numbers are disconnected facts until something says
-  // how they relate. The finding on this field is that the bare window is
-  // in SPRING and the heaviest rain lands inside it -- that is the whole
-  // argument, and it was nowhere on the page.
-  const headline = (() => {
-    const gap = bundle.gaps[0]
-    if (!gap) return null
-    const peak = clim.erosivity_peak_doy
-    const inGap =
-      gap.start_doy <= gap.end_doy
-        ? peak >= gap.start_doy && peak <= gap.end_doy
-        : peak >= gap.start_doy || peak <= gap.end_doy
-    const span = `${doyToDate(gap.start_doy).label} to ${doyToDate(gap.end_doy).label}`
-    const share = Math.round(gap.share_of_annual_r * 100)
-    const peakLabel = doyToDate(peak).label
-    const head = `Bare ${span} — ${share}% of the year's erosive rain falls in that window`
-    if (inGap) return `${head}, straight through the ${peakLabel} peak.`
-    // Wrap-aware: the peak can sit just past the end of the gap, or just
-    // before it opens. Saying "straight through the peak" when it is five
-    // days outside would be an overstatement a judge could check.
-    const after = (peak - gap.end_doy + 365) % 365
-    const before = (gap.start_doy - peak + 365) % 365
-    if (after <= 21) return `${head}, closing just as the ${peakLabel} peak arrives.`
-    if (before <= 21) return `${head}. The ${peakLabel} peak lands just before it opens.`
-    return `${head}. The heaviest rain centres on ${peakLabel}.`
-  })()
+  // Both the header sentence and the Act copy now come from lib/acts.ts,
+  // which derives every figure from the bundle and is unit-tested. Switching
+  // farms rewrites the story instead of leaving stale numbers behind.
+  const actInput = {
+    place: bundle.farm.place,
+    bareDays: current.bare_days,
+    bareDaysByPhase: current.bare_days_by_phase ?? null,
+    phaseLabels,
+    gap: bundle.gaps[0] ?? null,
+    erosivityPeakDoy: clim.erosivity_peak_doy,
+    alternatives: bundle.rotations
+      .filter((r) => !r.is_current)
+      .map((r) => ({
+        label: r.label,
+        bareDays: r.bare_days,
+        deltaPct: r.delta_vs_current_pct,
+        seedCostUsdHa: r.added_seed_cost_usd_ha,
+      }))
+      .sort((a, b) => a.deltaPct - b.deltaPct),
+    format: (doy: number) => doyToDate(doy).label,
+  }
+  const introBeats = buildIntroBeats({
+    place: bundle.farm.place,
+    ownerName: bundle.farm.owner_name,
+    bareDays: current.bare_days,
+    bareDaysByPhase: current.bare_days_by_phase ?? null,
+    phaseLabels,
+    gap: bundle.gaps[0] ?? null,
+    erosivityPeakDoy: clim.erosivity_peak_doy,
+    best: actInput.alternatives[0] ?? null,
+    format: (doy: number) => doyToDate(doy).label,
+  })
+  const headline = gapHeadline(actInput)
+  const acts = buildActs(actInput)
+
+  // Scrubbing the wheel should tick like the time lever does. playTick
+  // throttles itself, so wrapping the setter is safe at pointer-move rates.
+  const scrubTo = (doy: number) => {
+    playTick()
+    setSelectedDoy(doy)
+  }
+
+  const logDiary = (text: string) => {
+    setDiary((d) => [{ id: `${Date.now()}`, stamp: doyToDate(selectedDoy).label, text }, ...d].slice(0, 12))
+    // Hold the pen for as long as the diary takes to type the line out
+    // (22 ms a character), so sprite and text finish together.
+    setWriting(true)
+    window.clearTimeout(writeTimer.current)
+    writeTimer.current = window.setTimeout(() => setWriting(false), Math.min(4000, 700 + text.length * 22))
+  }
+
+  const runStorm = () => {
+    stormTimers.current.forEach((t) => window.clearTimeout(t))
+    stormTimers.current = []
+    playSwitch()
+    scrubTo(worstStormDoy)
+    setStorm(1)
+    // Build, hold, clear. Three timeouts beat a rAF ramp here: nothing
+    // reads the intermediate values, only CSS transitions do.
+    stormTimers.current.push(window.setTimeout(() => setStorm(0.5), 2800))
+    stormTimers.current.push(window.setTimeout(() => setStorm(0), 4400))
+    logDiary(`Ran the heaviest storm on record (day ${worstStormDoy}).`)
+    setGuideEvent({
+      type: 'denied',
+      detail: `This is ${doyToDate(worstStormDoy).label} \u2014 the heaviest rain in the whole record. Watch the bare ground.`,
+      nonce: Date.now(),
+    })
+  }
 
   const baselineCover = selected?.soil_cover ?? current.soil_cover
   const accepted = placedFills.map((id) => fitById.get(id)).filter((fit) => fit?.feasible && fit.coverCurve.length === 365)
@@ -224,53 +342,247 @@ export default function App() {
     const fit = fitById.get(speciesId)
     const species = bundle.species.find((s) => s.id === speciesId)
     const decision = placeDecision(fit, species, bundle.gaps[0], day, earliestSeedDoy)
-    if (!decision.accepted) { setPlacementMessage(decision.reason); return }
+    if (!decision.accepted) {
+      playDeny()
+      setGuideEvent({ type: 'denied', detail: decision.reason, nonce: Date.now() })
+      setPlacementMessage(decision.reason)
+      return
+    }
+    playSeedDrop()
+    logDiary(
+      fit
+        ? `Sowed ${fit.speciesName} on day ${day}. Model says −${fit.pctReduction.toFixed(0)}% erosion exposure in this gap (${fit.curveSource} curve).`
+        : `Sowed ${speciesId} on day ${day}.`,
+    )
+    // The chime is the reward, so it only fires when the placement actually
+    // buys something. A crop that changes nothing gets the thud alone.
+    if ((fit?.deltaExposedR ?? 0) > 0) window.setTimeout(playChime, 190)
     addPlacedFill(speciesId)
     setDraggingSpecies(null)
+    setGuideEvent({ type: 'placed', nonce: Date.now() })
     setPlacementMessage(decision.reason)
   }
 
-  return <div className="site-shell" data-season={seasonAtDoy(selectedDoy)} id="top">
-    {bundle.provenance.is_synthetic && <div className="fixture-banner" role="status"><span>✳</span> SYNTHETIC SAMPLE — simulated soil cover; no satellite observations. <span>✳</span></div>}
+  // Soil thickening: how much of the baseline bare ground the current
+  // proposal has closed, 0..1. Drives a green wash over the field art and a
+  // pulse on the wheel, so placing a crop is felt and not only tabulated.
+  const lush = baselineBare > 0 ? Math.max(0, Math.min(1, (baselineBare - proposedBare) / baselineBare)) : 0
+
+  const livingCover = accepted.length
+    ? spliceRotationCover(clim.green_cover, (accepted as NonNullable<typeof accepted[number]>[]).map((f) => f.coverCurve))
+    : clim.green_cover
+
+  // The weather over the terrain comes from the same two numbers the
+  // panels argue from, so the picture can never contradict them.
+  const weather = fieldMode(
+    clim.n_obs_per_doy[selectedDoy - 1] > 0 ? ringCover[selectedDoy - 1] : null,
+    clim.erosivity_r[selectedDoy - 1] ?? 0,
+    Math.max(...clim.erosivity_r),
+    clim.n_obs_per_doy[selectedDoy - 1],
+  )
+
+  const guide = guideLine({
+    place: bundle.farm.place,
+    doy: selectedDoy,
+    cover: clim.n_obs_per_doy[selectedDoy - 1] > 0 ? ringCover[selectedDoy - 1] : null,
+    erosivity: clim.erosivity_r[selectedDoy - 1] ?? 0,
+    erosivityMax: Math.max(...clim.erosivity_r),
+    gap: bundle.gaps[0] ?? null,
+    bareDays: current.bare_days,
+    baselineBare,
+    proposedBare,
+    picked: pickedFit
+      ? { name: pickedFit.speciesName, feasible: pickedFit.feasible, reason: pickedFit.reason, seedDoy: pickedFit.seedDoy }
+      : null,
+    placedCount: placedFills.length,
+    act: slide,
+    phases:
+      phaseCovers && phaseLabels && phaseCovers.length === phaseLabels.length
+        ? phaseCovers.map((pc, i) => ({ label: phaseLabels[i], cover: pc[selectedDoy - 1] ?? 0 }))
+        : null,
+    moisture: clim.soil_moisture[selectedDoy - 1],
+    best: actInput.alternatives[0] ?? null,
+    event: guideEvent.type,
+    eventDetail: guideEvent.detail,
+  })
+
+  const SLIDES = [
+    { id: 'year', eyebrow: 'Act one', label: 'The crisis' },
+    { id: 'desk', eyebrow: 'Act two', label: "The farmer's desk" },
+    { id: 'soil', eyebrow: 'Act three', label: 'The root zone' },
+    { id: 'futures', eyebrow: 'Act four', label: 'Three futures' },
+  ]
+  const actCopy = acts[slide] ?? acts[0]
+
+  return <div className="site-shell is-deck" data-season={seasonAtDoy(selectedDoy)} data-act={SLIDES[slide]?.id} id="top">
+    {bundle.provenance.is_synthetic && <div className="fixture-banner" role="status"><span>&#10035;</span> SYNTHETIC SAMPLE &mdash; simulated soil cover; no satellite observations. <span>&#10035;</span></div>}
+
     <nav className="topbar" aria-label="Site navigation">
-      <a className="brand" href="#top"><span className="brand-seal" aria-hidden="true">✺</span><span>Fallow Clock<small>THE LIVING YEAR</small></span></a>
-      <div className="top-links"><a href="#year">The year</a><a href="#planner">Crop studio</a><a href="#evidence">Field notes</a></div>
-      <AudioAtmosphere doy={selectedDoy} />
+      <a className="brand" href="#top"><span className="brand-seal" aria-hidden="true">&#10042;</span><span>Fallow Clock<small>THE LIVING YEAR</small></span></a>
+      <div className="farm-switch" role="group" aria-label="Choose a field">{FARMS.map((f) => <button type="button" key={f.id} onClick={() => { playSwitch(); setFarmId(f.id) }} aria-pressed={farmId === f.id} className={farmId === f.id ? 'is-active' : ''}>{f.label}</button>)}</div>
+      <div className="top-links">
+        <button type="button" className="notes-trigger" onClick={() => { playSwitch(); setNotesOpen(true) }} aria-haspopup="dialog">Field notes <span>{bundle.uncertainty.length}</span></button>
+        <AudioAtmosphere doy={selectedDoy} />
+      </div>
     </nav>
 
-    <header className="workspace-intro" id="year">
-      <div className="overview-copy"><span className="eyebrow">✦ THE LIVING YEAR · {bundle.farm.place}</span><h1>Find the <em>hole</em> in your year.</h1><p>{headline ?? 'Explore soil cover, rainfall erosivity, and the seasons around one field.'}</p><div className="farm-switch" role="group" aria-label="Choose a field">{FARMS.map((f) => <button type="button" key={f.id} onClick={() => setFarmId(f.id)} aria-pressed={farmId === f.id} className={farmId === f.id ? 'is-active' : ''}>{f.label}</button>)}</div><small>{bundle.provenance.is_synthetic ? 'Interactive sample field' : bundle.farm.owner_name.startsWith('TBD') ? 'Observed Story County field' : bundle.farm.owner_name} · {bundle.farm.area_ha} ha</small></div>
-      <div className="field-summary overview-summary" aria-label="Field overview">
-        <div><span className="eyebrow">{bundle.provenance.is_synthetic ? 'From this sample' : 'From this field'}</span><strong>{current.bare_days} <small>days</small></strong><p>{phaseSplit ?? `of ${bundle.provenance.is_synthetic ? 'simulated' : 'observed'} bare soil expected per year`}</p></div>
-        <div><span className="eyebrow">Erosivity overlap</span><strong>{Math.round((bundle.gaps[0]?.share_of_annual_r ?? 0) * 100)}<small>%</small></strong><p>of annual erosivity overlaps the largest bare gap</p></div>
+    {!entered && (
+      <div className="enter-gate" role="dialog" aria-label="Start Fallow Clock">
+        <div className="enter-card">
+          <span className="eyebrow">NASA Space Apps 2026 &middot; Field Shift</span>
+          <h1>Fallow Clock</h1>
+          <p>Find the hole in your year.</p>
+          <button
+            type="button"
+            className="enter-begin"
+            onClick={() => {
+              // The one gesture browsers require before audio can play.
+              // Narration, typing and atmosphere are all unblocked here.
+              setEngineSound(true)
+              useStore.getState().setSoundEnabled(true)
+              primeOnFirstGesture()
+              setEntered(true)
+            }}
+          >
+            &#9654; Begin
+          </button>
+          <small>Narrated. Best with sound on.</small>
+        </div>
       </div>
-    </header>
+    )}
 
-    <main className="workspace-main">
-      <div className="main-grid">
-        <section className="ring-column" aria-label="Interactive agricultural calendar">
-          <div className="hero-world" data-season={seasonAtDoy(selectedDoy)} data-mode={mode} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); setPlacementMessage('Drop the packet onto a day on the wheel, or use the suggested date button.') }}>
-            <Suspense fallback={null}><SeasonalWorld doy={selectedDoy} /></Suspense>
-            <YearRing initialMode="3D" showLegend={false} soilCover={ringCover} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} frostProb={clim.frost_prob} greenCover={clim.green_cover} residueCover={clim.residue_cover} compareCover={selected ? current.soil_cover : accepted.length ? baselineCover : undefined} highlightDoys={plantingDoys} selectedDoy={selectedDoy} onHoverDay={setHoveredDoy} onSelectDay={setSelectedDoy} onActivateDay={(day) => draggingSpeciesId && placeCrop(day)} onModeChange={setMode} reducedMotion={reducedMotion} synthetic={bundle.provenance.is_synthetic} />
+    {/* Mounted UNDER the descent, not after it, so the deck never shows
+        through during the cross-fade. */}
+    {entered && !briefDone && (
+      <FarmerIntro beats={introBeats} reducedMotion={reducedMotion} onDone={finishBrief} active={introDone} />
+    )}
+
+    {entered && !introDone && (
+      <SatelliteIntro farmId={farmId} place={bundle.farm.place} areaHa={bundle.farm.area_ha} rotationLabel={bundle.observed_rotation?.inferred_label ?? 'Corn-Soybean'} bareDays={current.bare_days} reducedMotion={reducedMotion} onDone={finishSatellite} />
+    )}
+
+    <SlideDeck slides={SLIDES} index={slide} onIndex={setSlide} reducedMotion={reducedMotion}>
+
+      {/* ---------------- Act 1 - the crisis ---------------- */}
+      <div className="act-pane pane-crisis">
+        <div className="act-head">
+          <span className="eyebrow">{actCopy.eyebrow} &middot; {bundle.farm.place}</span>
+          <h1>Find the <em>hole</em> in your year.</h1>
+          <p>{headline ?? 'Explore soil cover, rainfall erosivity, and the seasons around one field.'}</p>
+        </div>
+        <div className="pane-grid">
+          <div className="pane-main">
+            <div className="hero-world" data-season={seasonAtDoy(selectedDoy)} data-mode={mode} data-lush={lush > 0.02 ? 'on' : 'off'} style={{ ['--lush' as string]: lush.toFixed(3) }} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); setPlacementMessage('Drop the packet onto a day on the wheel, or use the suggested date button.') }}>
+              <Suspense fallback={null}>
+                <ParallaxField farmId={farmId} act={slide} mode={weather.mode} intensity={weather.intensity} storm={storm} reducedMotion={reducedMotion} />
+              </Suspense>
+              <YearRing initialMode="3D" showLegend={false} soilCover={ringCover} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} frostProb={clim.frost_prob} greenCover={clim.green_cover} residueCover={clim.residue_cover} compareCover={selected ? current.soil_cover : accepted.length ? baselineCover : undefined} highlightDoys={plantingDoys} selectedDoy={selectedDoy} onHoverDay={setHoveredDoy} onSelectDay={scrubTo} onActivateDay={(day) => draggingSpeciesId && placeCrop(day)} onModeChange={(m) => { playSwitch(); setMode(m) }} reducedMotion={reducedMotion} synthetic={bundle.provenance.is_synthetic} />
+            </div>
+            <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
+            <div className="lush-meter" aria-hidden={lush <= 0.02}><span style={{ width: `${Math.round(lush * 100)}%` }} /><small>{lush > 0.02 ? `${baselineBare - proposedBare} bare days closed` : 'No proposal yet'}</small></div>
           </div>
-          <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
-          {placementMessage && <p className="placement-message" role="status">{placementMessage}</p>}
-        </section>
-
-        <aside className="planner-column" id="planner">
-          <details className="sidebar-section sidebar-day" open><summary>Selected day & climate</summary><AtmosphereReadout doy={selectedDoy} climate={clim} synthetic={bundle.provenance.is_synthetic} /><p className="ring-caption">{hoveredDoy ? `DOY ${hoveredDoy} · ${clim.n_obs_per_doy[hoveredDoy - 1] > 0 ? `soil cover ${(ringCover[hoveredDoy - 1] * 100).toFixed(0)}%` : 'soil cover unknown'} · ${clim.n_obs_per_doy[hoveredDoy - 1]} ${bundle.provenance.is_synthetic ? 'simulated' : 'observations'}` : bundle.provenance.is_synthetic ? 'Interactive synthetic sample. No satellite cover observations are claimed.' : 'Hover or select a day to read the field. The illustrated season is decorative.'}</p>{phaseCovers && phaseLabels && phaseCovers.length === phaseLabels.length && <p className="ring-caption phase-caption">This day by rotation phase: {phaseCovers.map((pc, i) => `${phaseLabels[i]} ${(pc[selectedDoy - 1] * 100).toFixed(0)}% (${pc[selectedDoy - 1] < 0.3 ? 'bare' : 'covered'})`).join(' · ')}. The ring shows their mean, so a day can read covered here and still sit inside a gap that is bare in one phase.</p>}</details>
-          <CropPlanner species={bundle.species} fits={ranked} picked={draggingSpeciesId} placed={placedFills} onPick={setDraggingSpecies} onPlace={() => pickedFit && placeCrop(pickedFit.seedDoy)} onRemove={removePlacedFill} onReset={resetPlacedFills} baselineBare={baselineBare} proposedBare={proposedBare} baselineExposure={baselineExposure} proposedExposure={proposedExposure} />
-          <details className="sidebar-section"><summary>Rotation paths</summary>
-<section className="rotation-card"><div className="card-title"><span className="eyebrow">Compare futures</span><h2>Rotation paths</h2></div><div className="rotation-list">{bundle.rotations.map((r) => <button type="button" key={r.id} onClick={() => selectRotation(r.is_current ? null : r.id)} aria-pressed={(selected?.id ?? current.id) === r.id} className="rotation-option"><span className="rotation-icon" aria-hidden="true">{r.is_current ? '◌' : '✿'}</span><span className="rotation-copy"><strong>{r.label}</strong><small>{r.bare_days} bare days · {r.added_seed_cost_usd_ha > 0 ? `+$${r.added_seed_cost_usd_ha}/ha seed` : 'current practice'}{r.n_credit_kg_ha > 0 ? ` · ${r.n_credit_kg_ha} kg N/ha credit` : ''}</small></span><span className="rotation-delta">{r.delta_vs_current_pct === 0 ? 'Baseline' : `${r.delta_vs_current_pct.toFixed(0)}% soil loss`}</span></button>)}</div></section>
-          </details>
-        </aside>
+          <aside className="pane-side">
+            <div className="field-summary" aria-label="Field overview">
+              <div><span className="eyebrow">{bundle.provenance.is_synthetic ? 'From this sample' : 'From this field'}</span><strong>{current.bare_days} <small>days</small></strong><p>{phaseSplit ?? `of ${bundle.provenance.is_synthetic ? 'simulated' : 'observed'} bare soil expected per year`}</p></div>
+              <div><span className="eyebrow">Erosivity overlap</span><strong>{Math.round((bundle.gaps[0]?.share_of_annual_r ?? 0) * 100)}<small>%</small></strong><p>of annual erosivity overlaps the largest bare gap</p></div>
+            </div>
+            <CropPlanner species={bundle.species} fits={ranked} picked={draggingSpeciesId} placed={placedFills} onPick={setDraggingSpecies} onPlace={() => pickedFit && placeCrop(pickedFit.seedDoy)} onRemove={removePlacedFill} onReset={resetPlacedFills} baselineBare={baselineBare} proposedBare={proposedBare} baselineExposure={baselineExposure} proposedExposure={proposedExposure} />
+            {placementMessage && <p className="placement-message" role="status">{placementMessage}</p>}
+            <RingLegend compact showDetails={false} />
+          </aside>
+        </div>
       </div>
-<section className="field-notes" id="evidence"><div className="section-heading"><span className="section-number">02 / FIELD NOTES</span><h2>Beauty, with evidence beneath it.</h2><p>Planting ideas are proposals. We keep observations, modelled cover, and uncertainty visible.</p></div><div className="evidence-legend"><RingLegend compact showDetails /></div><div className="notes-grid">
-        <article className="notes-card"><div className="notes-card-title"><span className="notes-ornament">❦</span><div><span className="eyebrow">Crop fit</span><h3>What fits the longest gap</h3></div></div><ol className="fit-list">{ranked.slice(0, 6).map((fit, index) => <li key={fit.speciesId} className={fit.feasible ? '' : 'unavailable'}><span className="fit-number">{String(index + 1).padStart(2, '0')}</span><span><strong>{fit.speciesName}</strong><small>{fit.feasible ? `${fit.curveSource} cover · suggested seed day ${fit.seedDoy}` : fit.reason}</small></span><span className="fit-benefit">{fit.feasible ? `−${fit.pctReduction.toFixed(0)}%` : '—'}</span></li>)}</ol><p className="notes-footnote">Reduction in erosion exposure within the largest gap. Ranked by <strong>evidence first</strong>: a species we measured on neighbouring fields outranks a modelled one even when the model promises more. Every modelled curve uses the same generic plateau, so modelled species tie at identical percentages and read higher than they should — the measured curve is lower because it is real. Treat modelled figures as an upper bound.</p></article>
-        <article className="notes-card"><div className="notes-card-title"><span className="notes-ornament">✧</span><div><span className="eyebrow">Uncertainty ledger</span><h3>What we do not know</h3></div></div><ul className="uncertainty-list">{bundle.uncertainty.map((u, i) => <li key={i}><div><span className={`uncertainty-level level-${u.level}`}>{u.level}</span><code>{u.field}</code></div><p>{u.reason}</p><small>{u.affects}</small></li>)}</ul></article>
-      </div><div className="provenance-strip"><span>✦ &nbsp; DATA SOURCES</span><div>{bundle.provenance.sources.map((source, i) => <span key={i}>{source.name}</span>)}</div><small>Years: {bundle.provenance.years_used.join(', ') || 'unspecified'}</small></div></section>
 
-    </main>
-    <footer className="site-footer"><span className="footer-mark" aria-hidden="true">✺</span><div><strong>Fallow Clock</strong><small>A living view of the agricultural year.</small></div><p>Seasonal artwork illustrates time and atmosphere. Field values and planning estimates come from the loaded data bundle.</p><nav aria-label="Footer navigation"><a href="#year">The year</a><a href="#planner">Crop studio</a><a href="#evidence">Field notes</a><a href="#top">Back to top ↑</a></nav></footer>
+      {/* ---------------- Act 2 - the farmer's desk ---------------- */}
+      <div className="act-pane pane-desk">
+        <div className="act-head">
+          <span className="eyebrow">{acts[1].eyebrow}</span>
+          <h1>{acts[1].title}</h1>
+          <p>{acts[1].line}</p>
+        </div>
+        <div className="pane-grid">
+          <div className="pane-main desk-readout">
+            <AtmosphereReadout doy={selectedDoy} climate={clim} synthetic={bundle.provenance.is_synthetic} />
+            <p className="ring-caption">{hoveredDoy ? `DOY ${hoveredDoy} · ${clim.n_obs_per_doy[hoveredDoy - 1] > 0 ? `soil cover ${(ringCover[hoveredDoy - 1] * 100).toFixed(0)}%` : 'soil cover unknown'} · ${clim.n_obs_per_doy[hoveredDoy - 1]} ${bundle.provenance.is_synthetic ? 'simulated' : 'observations'}` : 'Hover a day on the wheel in Act one, or scrub below.'}</p>
+            {phaseCovers && phaseLabels && phaseCovers.length === phaseLabels.length && <p className="ring-caption phase-caption">This day by rotation phase: {phaseCovers.map((pc, i) => `${phaseLabels[i]} ${(pc[selectedDoy - 1] * 100).toFixed(0)}% (${pc[selectedDoy - 1] < 0.3 ? 'bare' : 'covered'})`).join(' \u00b7 ')}. The ring shows their mean, so a day can read covered here and still sit inside a gap that is bare in one phase.</p>}
+            <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
+          </div>
+          <aside className="pane-side">
+            <FarmerDiary entries={diary} reducedMotion={reducedMotion} inline />
+          </aside>
+        </div>
+      </div>
+
+      {/* ---------------- Act 3 - the root zone ---------------- */}
+      <div className="act-pane pane-root">
+        <div className="act-head">
+          <span className="eyebrow">{acts[2].eyebrow}</span>
+          <h1>{acts[2].title}</h1>
+          <p>{acts[2].line}</p>
+        </div>
+        <div className="pane-grid">
+          <div className="pane-main">
+            <button type="button" className="storm-run" onClick={runStorm} disabled={storm > 0}>
+              {storm > 0 ? 'Storm running\u2026' : `\u26c8 Run the year's worst storm (${doyToDate(worstStormDoy).label})`}
+            </button>
+            <SoilCutaway doy={selectedDoy} greenCover={livingCover} residueCover={clim.residue_cover} soilCover={ringCover} soilMoisture={clim.soil_moisture} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} label={bundle.farm.place} reducedMotion={reducedMotion} />
+            <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
+          </div>
+          <aside className="pane-side">
+            <article className="notes-card"><div className="notes-card-title"><span className="notes-ornament">&#10086;</span><div><span className="eyebrow">Crop fit</span><h3>What fits the longest gap</h3></div></div><ol className="fit-list">{ranked.slice(0, 6).map((fit, index) => <li key={fit.speciesId} className={fit.feasible ? '' : 'unavailable'}><span className="fit-number">{String(index + 1).padStart(2, '0')}</span><span><strong>{fit.speciesName}</strong><small>{fit.feasible ? `${fit.curveSource} \u00b7 sow ${doyToDate(fit.seedDoy).label}` : fit.reason}</small></span><span className="fit-benefit">{fit.feasible ? `\u2212${fit.pctReduction.toFixed(0)}%` : '\u2014'}</span></li>)}</ol><button type="button" className="fit-more" onClick={() => { playSwitch(); setNotesOpen(true) }}>How this is scored &rarr;</button></article>
+            <p className="soil-caption">Residue is <strong>observed</strong>. Water line and topsoil darkness are <strong>modelled</strong>. Root depth is <strong>derived</strong> from green cover. Soil only sheds on days that were actually observed.</p>
+          </aside>
+        </div>
+      </div>
+
+      {/* ---------------- Act 4 - three futures ---------------- */}
+      <div className="act-pane pane-futures" id="planner">
+        <div className="act-head">
+          <span className="eyebrow">{acts[3].eyebrow}</span>
+          <h1>{acts[3].title}</h1>
+          <p>{acts[3].line}</p>
+        </div>
+        <SplitCore
+          doy={selectedDoy}
+          scenarios={bundle.rotations.map((r) => ({
+            id: r.id,
+            label: r.label,
+            isCurrent: r.is_current,
+            soilCover: r.soil_cover,
+            bareDays: r.bare_days,
+            bareDaysByPhase: r.bare_days_by_phase ?? null,
+            seedCostUsdHa: r.added_seed_cost_usd_ha,
+            deltaPct: r.delta_vs_current_pct,
+            nCreditKgHa: r.n_credit_kg_ha,
+          }))}
+          greenCover={clim.green_cover}
+          residueCover={clim.residue_cover}
+          soilMoisture={clim.soil_moisture}
+          erosivity={clim.erosivity_r}
+          nObs={clim.n_obs_per_doy}
+          phaseLabels={phaseLabels}
+          reducedMotion={reducedMotion}
+        />
+        <div className="rotation-list">{bundle.rotations.map((r) => <button type="button" key={r.id} onClick={() => selectRotation(r.is_current ? null : r.id)} aria-pressed={(selected?.id ?? current.id) === r.id} className="rotation-option"><span className="rotation-icon" aria-hidden="true">{r.is_current ? '\u25cc' : '\u273f'}</span><span className="rotation-copy"><strong>{r.label}</strong><small>{r.bare_days} bare days &middot; {r.added_seed_cost_usd_ha > 0 ? `+$${r.added_seed_cost_usd_ha}/ha seed` : 'current practice'}</small></span><span className="rotation-delta">{r.delta_vs_current_pct === 0 ? 'Baseline' : `${r.delta_vs_current_pct.toFixed(0)}% soil loss`}</span></button>)}</div>
+      </div>
+
+    </SlideDeck>
+
+    {/* Act 2 is the farmer's desk, so that is where he walks to. */}
+    <FarmerGuide line={guide} reducedMotion={reducedMotion} walkTo={slide === 1 ? 0.34 : null} writing={writing} />
+    <FieldNotes open={notesOpen} onClose={() => setNotesOpen(false)} data={{
+      place: bundle.farm.place,
+      areaHa: bundle.farm.area_ha,
+      ownerName: bundle.farm.owner_name,
+      synthetic: bundle.provenance.is_synthetic,
+      years: bundle.provenance.years_used,
+      sources: bundle.provenance.sources,
+      uncertainty: bundle.uncertainty,
+      rotationLabel: bundle.observed_rotation?.inferred_label ?? 'Rotation unknown',
+      phaseLabels: phaseLabels,
+      bareDays: current.bare_days,
+      bareDaysByPhase: current.bare_days_by_phase ?? null,
+      diary,
+    }} />
   </div>
 }

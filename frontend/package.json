@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "gen:types": "json-schema-to-typescript src/types/bundle.schema.json -o src/types/bundle.ts --no-additionalProperties",
-    "refresh:contract": "cd ../backend && python scripts/export_schema.py && cd ../frontend && npm run gen:types"
+    "refresh:contract": "cd ../backend && python scripts/export_schema.py && cd ../frontend && npm run gen:types",
+    "sync:sprites": "node scripts/sync-sprites.mjs"
   },
   "dependencies": {
     "@types/three": "^0.187.0",

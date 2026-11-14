@@ -173,7 +173,7 @@ def heat_stress_probability() -> list[float]:
 
 
 def soil_moisture_curve() -> list[float]:
-    """SMAP-like: wet spring, late-summer drawdown. COARSE -- regional only."""
+    """Bucket-model shaped: wet spring, late-summer drawdown. Synthetic."""
     return [
         round(0.28 + 0.09 * math.cos(2 * math.pi * (d - 110) / DOY_LEN), 4)
         for d in DOYS
@@ -387,10 +387,12 @@ def build() -> Bundle:
             Uncertainty(
                 field="soil_moisture",
                 level="high",
-                reason="SMAP is 9-11 km; this field is 65 ha. A single SMAP pixel "
-                "covers roughly 1,500 fields of this size.",
-                affects="Use as a regional planting-window flag only. Check your "
-                "own field before seeding.",
+                reason="A MODELLED single-layer bucket water balance, not a "
+                "measurement. Nobody observed this. We did not use SMAP: it "
+                "needs an Earthdata login and is 9-11 km, so one pixel would "
+                "cover roughly 1,500 fields of this size.",
+                affects="Use as a coarse planting-window go/no-go only. Check "
+                "your own field before seeding.",
             ),
             Uncertainty(
                 field="n_obs_per_doy",

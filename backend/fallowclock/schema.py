@@ -124,8 +124,11 @@ class Climatology(Strict):
     frost_prob: DoyFloats = Field(description="P(Tmin < 0 C)")
     heat_stress_prob: DoyFloats = Field(description="P(Tmax > 32 C)")
     soil_moisture: DoyFloats = Field(
-        description="SMAP, 0-1. COARSE (9-11 km) -- regional flag only, never "
-        "presented as a field-scale number."
+        description="Plant-available water, 0-1, from a single-layer bucket "
+        "water balance driven by NASA POWER rainfall and Hargreaves-Samani "
+        "reference ET. MODELLED, NOT MEASURED -- label it so in the UI. This "
+        "is NOT SMAP: SMAP needs an Earthdata login and is 9-11 km, so one "
+        "pixel would cover roughly 1,500 fields this size. See soilwater.py."
     )
     phase_covers: list[DoyFloats] | None = Field(
         default=None,

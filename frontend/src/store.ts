@@ -17,6 +17,14 @@ export interface AppState {
   selectedDoy: number
   placedFills: string[]
   reducedMotion: boolean
+  /** One switch for ambience AND interaction sound. The header owns it. */
+  soundEnabled: boolean
+  /**
+   * Which part of the experience is playing, so the audio bed can differ.
+   * 'intro' is narration only -- music under a voiceover competes with it
+   * and the opening line is the one that has to land.
+   */
+  audioStage: 'intro' | 'brief' | 'tool'
   /** RUSLE cover-subfactor coefficient, exposed so judges can test sensitivity. */
   rusleB: number
 
@@ -30,6 +38,8 @@ export interface AppState {
   removePlacedFill: (id: string) => void
   resetPlacedFills: () => void
   setReducedMotion: (reduced: boolean) => void
+  setSoundEnabled: (on: boolean) => void
+  setAudioStage: (s: 'intro' | 'brief' | 'tool') => void
   setRusleB: (b: number) => void
 }
 
@@ -42,6 +52,8 @@ export const useStore = create<AppState>((set) => ({
   selectedDoy: 274,
   placedFills: [],
   reducedMotion: false,
+  soundEnabled: true,
+  audioStage: 'intro',
   rusleB: 0.035,
 
   setBundle: (bundle) => set({ bundle }),
@@ -54,5 +66,7 @@ export const useStore = create<AppState>((set) => ({
   removePlacedFill: (id) => set((s) => ({ placedFills: s.placedFills.filter((x) => x !== id) })),
   resetPlacedFills: () => set({ placedFills: [] }),
   setReducedMotion: (reducedMotion) => set({ reducedMotion }),
+  setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
+  setAudioStage: (audioStage) => set({ audioStage }),
   setRusleB: (rusleB) => set({ rusleB }),
 }))

@@ -24,6 +24,39 @@ const YearRing3D = lazy(() => import('./YearRing3D'))
 export const DOY_LEN = 365
 export const BARE_THRESHOLD = 0.3
 
+/** How far a dragged packet reaches for a legal day, in days of arc. */
+export const SNAP_RADIUS_DAYS = 24
+
+/**
+ * Snap a day to the nearest legal seeding day, or null if none is in reach.
+ *
+ * WRAP-AWARE, and that is the whole reason this is a named function with
+ * tests rather than three lines inline. An autumn-sown cover crop's seeding
+ * window runs through 31 December, so a plain |a - b| distance sends a drop
+ * near New Year to the opposite end of the year -- the same off-by-a-year
+ * mistake the gap detection had to be written around.
+ */
+export function snapToNearestDay(
+  day: number | null,
+  valid: Set<number> | null,
+  radius = SNAP_RADIUS_DAYS,
+): number | null {
+  if (day == null) return null
+  if (!valid || valid.size === 0) return day
+  if (valid.has(day)) return day
+  let best: number | null = null
+  let bestDist = Infinity
+  for (const d of valid) {
+    const raw = Math.abs(d - day)
+    const dist = Math.min(raw, DOY_LEN - raw)
+    if (dist < bestDist) {
+      bestDist = dist
+      best = d
+    }
+  }
+  return bestDist <= radius ? best : null
+}
+
 export interface YearRingProps {
   soilCover: number[]
   erosivity: number[]
@@ -263,6 +296,24 @@ export default function YearRing({
     [highlightDoys],
   )
 
+  /** Day the dragged packet would land on, after snapping. */
+  const [dragDoy, setDragDoy] = useState<number | null>(null)
+
+  /**
+   * Snap a pointer position to the nearest legal seeding day.
+   *
+   * Wrap-aware, because the seeding window for an autumn-sown cover crop
+   * runs through 31 December and a linear distance would send a drop near
+   * New Year to the wrong end of the year.
+   *
+   * Returns null when nothing legal is within reach, so an impossible drop
+   * still reaches placeDecision and the user gets told why.
+   */
+  const snapTo = useCallback(
+    (day: number | null) => snapToNearestDay(day, highlightSet),
+    [highlightSet],
+  )
+
   const bareDaysCount = useMemo(
     () => soilCover.filter((v, i) => (nObs[i] ?? 1) > 0 && v < BARE_THRESHOLD).length,
     [soilCover, nObs],
@@ -476,8 +527,24 @@ export default function YearRing({
             onPointerMove={handleMove}
             onPointerLeave={handleLeave}
             onClick={() => { if (activeHoveredDoy) { handleSelect(activeHoveredDoy); onActivateDay?.(activeHoveredDoy) } }}
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); const day = dayAtClientPoint(e.clientX, e.clientY); if (day) { handleSelect(day); onActivateDay?.(day) } }}
+            onDragOver={(e) => {
+              // Native HTML5 drag does not fire onPointerMove, so this is the
+              // only place a live position is available during a drag.
+              e.preventDefault()
+              const snapped = snapTo(dayAtClientPoint(e.clientX, e.clientY))
+              setDragDoy((prev) => (prev === snapped ? prev : snapped))
+            }}
+            onDragLeave={() => setDragDoy(null)}
+            onDrop={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              const raw = dayAtClientPoint(e.clientX, e.clientY)
+              // Prefer the snapped day; fall back to the raw one so an
+              // out-of-reach drop still produces a reason rather than silence.
+              const day = snapTo(raw) ?? raw
+              setDragDoy(null)
+              if (day) { handleSelect(day); onActivateDay?.(day) }
+            }}
             role="img"
             aria-label={`Year ring: this field is bare on ${bareDaysCount} of 365 days`}
           >
@@ -556,19 +623,22 @@ export default function YearRing({
               </g>
             )}
 
-            {/* Drag-to-fill highlight days */}
+            {/* The slot a seed packet can drop into, and the piece in it. */}
             {highlightSet && (
-              <g aria-hidden>
+              <g aria-hidden className="ring-slot">
                 {coverPaths.map((d, i) =>
                   highlightSet.has(i + 1) ? (
-                    <path
-                      key={`h${i}`}
-                      d={d}
-                      fill="none"
-                      stroke="#f5d547"
-                      strokeWidth={2.5}
-                    />
+                    <path key={`h${i}`} d={d} fill="#f5d54733" stroke="#f5d547" strokeWidth={2.5} />
                   ) : null,
+                )}
+                {dragDoy !== null && coverPaths[dragDoy - 1] && (
+                  <path
+                    className="ring-snap"
+                    d={coverPaths[dragDoy - 1]}
+                    fill="#ffe89a"
+                    stroke="#fffbe8"
+                    strokeWidth={3}
+                  />
                 )}
               </g>
             )}

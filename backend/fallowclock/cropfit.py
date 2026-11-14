@@ -54,8 +54,10 @@ from .schema import BARE_THRESHOLD, DOY_LEN, RUSLE_B_DEFAULT, Gap, Species
 # under-promise.
 DEFAULT_PLATEAU = 0.55
 
-# SMAP is 9-11 km, so this is a REGIONAL go/no-go flag, never a field-scale
-# number. Seeding into a dry regional anomaly is a real failure mode.
+# soil_moisture is a MODELLED bucket balance (soilwater.py), not a
+# measurement, so this is a coarse go/no-go flag and never a field-scale
+# number. Seeding into a modelled dry spell is still a real failure mode
+# worth flagging -- it just must not be reported as an observation.
 MIN_SEEDING_MOISTURE = 0.15
 
 # Cover crops are routinely seeded BEFORE the gap opens -- aerially
@@ -322,7 +324,7 @@ def fit_species_in_gap(
                 species.name,
                 seed_doy,
                 feasible=False,
-                reason="Regional soil moisture too low at seeding (SMAP, coarse)",
+                reason="Modelled soil water too low at seeding (bucket model, not a measurement)",
                 n_credit_kg_ha=species.n_credit_kg_ha,
                 seed_cost_usd_ha=species.seed_cost_usd_ha,
             )

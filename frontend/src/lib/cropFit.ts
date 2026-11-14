@@ -322,7 +322,7 @@ export function fitSpeciesInGap(
     if (clim.soilMoisture[seedDoy - 1] < MIN_SEEDING_MOISTURE) {
       lastFailure = base({
         seedDoy,
-        reason: 'Regional soil moisture too low at seeding (SMAP, coarse)',
+        reason: 'Modelled soil water too low at seeding (bucket model, not a measurement)',
       })
       continue
     }

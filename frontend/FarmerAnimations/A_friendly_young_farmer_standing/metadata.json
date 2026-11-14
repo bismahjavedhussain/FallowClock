@@ -1,0 +1,36 @@
+{
+  "group_id": "13332666-6ad0-44e4-8a54-2b39721e5aeb",
+  "states": [
+    {
+      "character": {
+        "id": "b12cb62d-14b0-4d9d-b0b8-896a1e6caa71",
+        "name": "Idle",
+        "prompt": "A friendly young farmer standing, wearing an earthy olive-green canvas jacket over a cream-colored sweater, brown work trousers, and durable leather boots. They have a thoughtful, welcoming expression, short hair, and a small utility satchel or belt pouch. Clean retro pixel art style, high contrast, crisp lines with a single color outline. Designed as a side-scrolling companion guide for an environmental data application.",
+        "size": {
+          "width": 64,
+          "height": 64
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-11-14T14:38:30.548727+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-11-14T14:40:42.285262"
+}

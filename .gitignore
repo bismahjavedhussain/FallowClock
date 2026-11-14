@@ -18,3 +18,14 @@ frontend/dist/
 
 # TypeScript incremental build cache (churns on every build)
 frontend/tsconfig.tsbuildinfo
+
+# Stray downloads (archives dropped into the project crash the dev watcher)
+*.zip
+*.rar
+*.7z
+
+# Leftovers from the first sprite zip extraction; the canonical source is
+# frontend/FarmerAnimations and the served copies are frontend/public/sprite.
+frontend/Idle/
+frontend/metadata.json
+frontend/A_friendly_young_farmer_standing/

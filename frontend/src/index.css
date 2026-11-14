@@ -335,7 +335,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .workspace-intro .eyebrow, .workspace-intro p, .workspace-field { color: #eaf6ef; }  /* 4.63:1 on the lightest gradient stop; #d2eadc was 4.05:1 and failed AA */
 .workspace-main { background: linear-gradient(180deg, #d3eadc55, transparent 70%); }
 .hero-world { background: #0d4b43; border: 1px solid #73a99a; box-shadow: 0 18px 45px #12473f40, inset 0 0 0 1px #ffffff40; }
-.seasonal-world { background: #0b4c45 url('/scene/emerald-clearing.webp') center 48% / cover no-repeat; }
+/* Retired: the rainforest photo was a stand-in for Iowa. See ParallaxField. */
 .seasonal-world::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #052c2a45, transparent 25%, transparent 74%, #05332944), linear-gradient(180deg, #0a473b1f, transparent 46%, #052b2952); pointer-events: none; }
 .season-layer { mix-blend-mode: soft-light; }
 .layer-spring { background: linear-gradient(180deg, #dff9df24, #a9e5bc25); }
@@ -384,7 +384,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .rotation-option[aria-pressed="true"] { background: #d9efdf; border-color: #4b9a79; }
 .sidebar-section > summary { color: #175b4d; }
 @media (prefers-reduced-motion: reduce) {
-  .forest-rain, .forest-light::before, .forest-light::after, .forest-haze, .forest-motes span { animation: none !important; }
+  .forest-rain, .forest-light::before, .forest-light::after, .forest-haze, .forest-motes span,
+  .soil-flecks rect, .soil-waterline, .forest-flash, .sat-frame, .sat-reticle span,
+  .farmer-guide.is-walking .farmer-sprite img, .farmer-guide.is-walking .farmer-shadow,
+  .deck-next-chev, .intro-caret, .farmer-guide.is-writing .farmer-sprite img { animation: none !important; }
+  .sat-spinner { animation-duration: 1.6s !important; }
+  .farmer-intro.stage-walking .intro-actor { animation: none !important; transform: translateX(clamp(60px, 22vw, 320px)); }
+  .diary-pages li.is-writing .diary-text { animation: none !important; clip-path: none !important; }
 }
 .seasonal-world.season-autumn { filter: sepia(.16) saturate(.9) hue-rotate(-10deg); }
 .seasonal-world.season-winter { filter: saturate(.36) hue-rotate(22deg) brightness(1.08); }
@@ -467,3 +473,572 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .farm-switch button:hover { background: #ffffff24; }
 .farm-switch button.is-active { background: #f6f8ee; color: #1b5e4a; }
 .farm-switch button:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
+
+
+/* ======================================================================
+   IMMERSIVE PASS
+   Field notes drawer, farmer guide, soil thickening, lushness meter.
+   The global prefers-reduced-motion rule near the top of this file already
+   flattens every animation below, so none of these need their own guard.
+   ====================================================================== */
+
+/* --- Field notes trigger in the top bar ------------------------------ */
+.notes-trigger { display: inline-flex; align-items: center; gap: 7px; min-height: 34px; padding: 0 13px; border: 1px solid #ffffff3d; border-radius: 999px; background: #ffffff1a; color: inherit; font: inherit; cursor: pointer; transition: background .18s, border-color .18s; }
+.notes-trigger:hover { background: #ffffff2e; border-color: #ffffff63; }
+.notes-trigger span { display: inline-grid; place-items: center; min-width: 19px; height: 19px; padding: 0 5px; border-radius: 999px; background: #e9b44c; color: #3a2a12; font: 700 10px/1 system-ui; }
+.notes-trigger:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
+
+/* --- The drawer ------------------------------------------------------- */
+.notes-overlay { position: fixed; inset: 0; z-index: 60; background: #05211ca8; backdrop-filter: blur(3px); animation: notes-fade .22s ease both; }
+.notes-drawer { position: absolute; top: 0; right: 0; display: flex; flex-direction: column; width: min(560px, 100%); height: 100%; background: #f7f6ec; box-shadow: -18px 0 50px #04231c4d; animation: notes-slide .28s cubic-bezier(.22,.9,.3,1) both; }
+.notes-drawer:focus { outline: none; }
+@keyframes notes-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes notes-slide { from { transform: translateX(26px); opacity: .4 } to { transform: none; opacity: 1 } }
+
+.notes-drawer-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px 24px 16px; border-bottom: 1px solid #dcdfd0; background: linear-gradient(120deg, #1b6e5e, #2a7a69); color: #f4faf2; }
+.notes-drawer-head h2 { margin: 4px 0 2px; font: 700 24px/1.1 Georgia, serif; color: #fff7de; }
+.notes-drawer-head small { color: #e3f1e6; font-size: 11px; }
+.notes-drawer-head .eyebrow { color: #eaf6ef; }
+.notes-drawer-head button { flex: none; width: 34px; height: 34px; border: 1px solid #ffffff4d; border-radius: 50%; background: #ffffff1f; color: #fff; font-size: 19px; line-height: 1; cursor: pointer; }
+.notes-drawer-head button:hover { background: #ffffff33; }
+
+.notes-drawer-body { flex: 1; overflow-y: auto; padding: 20px 24px 40px; overscroll-behavior: contain; }
+.notes-drawer-body section + section { margin-top: 26px; padding-top: 22px; border-top: 1px solid #e1e4d6; }
+.notes-drawer-body h3 { margin: 0 0 10px; font: 700 15px/1.2 Georgia, serif; color: #2c4b3c; }
+.notes-drawer-body p { margin: 0 0 8px; color: #46514a; font: 13px/1.6 system-ui; }
+.notes-rule { color: #5c6b60 !important; font-size: 12.5px !important; }
+.notes-warn { padding: 10px 12px; border-left: 3px solid #c0492f; border-radius: 0 8px 8px 0; background: #f6e2dd; color: #76291a !important; }
+.notes-sources { margin: 0 0 8px; padding: 0; list-style: none; display: grid; gap: 6px; }
+.notes-sources li { padding: 8px 11px; border: 1px solid #dfe3d4; border-radius: 9px; background: #fffef7; color: #41503f; font: 12px/1.4 system-ui; }
+.notes-drawer-body .uncertainty-list { margin: 0; padding: 0; }
+
+/* The on-screen notes grid now holds one card, so stop it stretching. */
+.notes-grid.single { grid-template-columns: minmax(0, 620px); }
+.fit-more { margin-top: 14px; padding: 0; border: 0; background: none; color: #2f6b52; font: 600 12px/1 system-ui; letter-spacing: .03em; cursor: pointer; }
+.fit-more:hover { text-decoration: underline; }
+
+/* --- Lushness meter under the lever ---------------------------------- */
+.lush-meter { position: relative; display: flex; align-items: center; gap: 10px; height: 22px; margin-top: 8px; }
+.lush-meter span { display: block; height: 6px; min-width: 0; border-radius: 999px; background: linear-gradient(90deg, #c9a227, #2f9e5f); transition: width .7s cubic-bezier(.22,.9,.3,1); }
+.lush-meter small { flex: none; color: #5f7366; font: 600 10px/1 system-ui; letter-spacing: .06em; text-transform: uppercase; }
+.lush-meter[aria-hidden='true'] { opacity: .45; }
+
+/* --- Soil thickening over the field art ------------------------------ */
+/* --lush runs 0..1 as proposals close bare ground. A green wash fades in
+   over the scene and the wheel gets a one-shot ring pulse, so a placement
+   is felt immediately rather than only changing a number in a table. */
+.hero-world { position: relative; }
+.hero-world::after { content: ''; position: absolute; inset: 0; z-index: 3; border-radius: inherit; pointer-events: none; opacity: calc(var(--lush, 0) * .55); background: radial-gradient(ellipse at 50% 72%, #2f9e5f66 0%, #1a5c3840 42%, transparent 72%); transition: opacity .9s ease; }
+.hero-world[data-lush='on'] { animation: lush-pulse .85s ease-out; }
+@keyframes lush-pulse {
+  0% { box-shadow: 0 18px 45px #12473f40, inset 0 0 0 1px #ffffff40, inset 0 0 0 0 #2f9e5f00; }
+  40% { box-shadow: 0 18px 45px #12473f40, inset 0 0 0 1px #ffffff40, inset 0 0 70px 6px #2f9e5f6b; }
+  100% { box-shadow: 0 18px 45px #12473f40, inset 0 0 0 1px #ffffff40, inset 0 0 0 0 #2f9e5f00; }
+}
+
+/* --- The farmer ------------------------------------------------------- */
+/* 64x64 pixel art, so every rule here exists to keep it CRISP. Scaled to an
+   exact 3x (192px) because a fractional multiple resamples the grid and the
+   whole charm goes with it, and image-rendering: pixelated to stop the
+   browser smoothing it into mush. */
+.farmer-guide { position: fixed; left: 18px; bottom: 14px; z-index: 50; display: flex; align-items: flex-end; gap: 4px; pointer-events: none; }
+.farmer-guide > * { pointer-events: auto; }
+
+.farmer-sprite { position: relative; flex: none; width: 192px; height: 192px; padding: 0; border: 0; background: none; cursor: pointer; display: grid; place-items: end center; }
+.farmer-sprite img {
+  width: 192px; height: 192px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;      /* Firefox */
+  -ms-interpolation-mode: nearest-neighbor;
+  filter: drop-shadow(0 4px 0 #04231c2e);
+  animation: farmer-bob 3.8s steps(2, end) infinite;
+}
+.farmer-sprite:focus-visible { outline: 2px solid #f0cf87; outline-offset: -6px; }
+.farmer-guide.is-still .farmer-sprite img { animation: none; }
+
+/* Steps, not a smooth tween: a pixel character that slides by sub-pixel
+   amounts looks wrong. Two discrete positions reads as a sprite animation. */
+@keyframes farmer-bob { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-3px) } }
+
+/* Grounding shadow, drawn as an element so it does not scale with the art. */
+.farmer-shadow { position: absolute; bottom: 14px; left: 50%; width: 76px; height: 10px; margin-left: -38px; border-radius: 50%; background: #06281fcc; filter: blur(3px); opacity: .45; }
+.farmer-guide.is-still .farmer-shadow { opacity: .4; }
+
+/* Speech bubble, squared off to sit with the pixel art rather than fight it.
+   Hard corners and a stepped tail, but a normal UI typeface -- a pixel font
+   at 13px is a legibility problem, and a farmer on a phone outdoors is the
+   stated audience. */
+.farmer-bubble {
+  position: relative; max-width: 300px; margin-bottom: 44px;
+  padding: 12px 32px 12px 14px;
+  border: 3px solid #2f4435; border-radius: 2px;
+  background: #fffdf2;
+  box-shadow: 4px 4px 0 #2f443559, 0 12px 28px #04231c2e;
+  animation: bubble-in .26s steps(3, end) both;
+}
+.farmer-bubble p { margin: 0; color: #2c3b2f; font: 13px/1.5 system-ui; }
+/* Tail built from two squares so the diagonal stays blocky. */
+.farmer-bubble::before { content: ''; position: absolute; left: 20px; bottom: -11px; width: 14px; height: 11px; background: #fffdf2; border-right: 3px solid #2f4435; border-bottom: 3px solid #2f4435; }
+.farmer-bubble::after { content: ''; position: absolute; left: 20px; bottom: -8px; width: 11px; height: 8px; background: #fffdf2; }
+.farmer-bubble-close { position: absolute; top: 5px; right: 6px; width: 20px; height: 20px; border: 2px solid #c4ccb8; border-radius: 2px; background: #eef1e4; color: #5d6b5c; font: 700 11px/1 system-ui; cursor: pointer; }
+.farmer-bubble-close:hover { background: #dfe4d2; color: #2f4435; }
+@keyframes bubble-in { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } }
+
+/* Tone colours the bubble, so a warning registers before it is read. */
+.farmer-guide[data-tone='warn'] .farmer-bubble { border-color: #8a3a24; background: #fff4ee; box-shadow: 4px 4px 0 #8a3a2440, 0 12px 28px #04231c2e; }
+.farmer-guide[data-tone='warn'] .farmer-bubble::before { background: #fff4ee; border-color: #8a3a24; }
+.farmer-guide[data-tone='warn'] .farmer-bubble::after { background: #fff4ee; }
+.farmer-guide[data-tone='warn'] .farmer-bubble p { color: #76301d; }
+.farmer-guide[data-tone='good'] .farmer-bubble { border-color: #1f6b43; background: #f3fcf4; box-shadow: 4px 4px 0 #1f6b4340, 0 12px 28px #04231c2e; }
+.farmer-guide[data-tone='good'] .farmer-bubble::before { background: #f3fcf4; border-color: #1f6b43; }
+.farmer-guide[data-tone='good'] .farmer-bubble::after { background: #f3fcf4; }
+.farmer-guide[data-tone='good'] .farmer-bubble p { color: #1b5536; }
+
+@media (max-width: 700px) {
+  .farmer-guide { left: 8px; right: 8px; bottom: 6px; gap: 0; }
+  .farmer-bubble { max-width: none; flex: 1; margin-bottom: 26px; }
+  /* Exact 2x on small screens -- still an integer multiple, still crisp. */
+  .farmer-sprite, .farmer-sprite img { width: 128px; height: 128px; }
+  .farmer-shadow { bottom: 10px; width: 52px; margin-left: -26px; }
+  .notes-drawer { width: 100%; }
+}
+
+
+/* ======================================================================
+   THE ROOT ZONE  (components/soil/SoilCutaway.tsx)
+   Appended at the end of the file on purpose: index.css is written in two
+   passes and the second redeclares the first's selectors from ~line 323,
+   so anything new has to land after it to win.
+   ====================================================================== */
+
+.soil-cutaway { margin: 0; position: relative; border-radius: 16px; overflow: hidden; background: linear-gradient(180deg, #d9e9dd 0%, #cfe0d2 38%, transparent 38%); box-shadow: inset 0 0 0 1px #ffffff8c, 0 10px 26px #4b3a1f1f; }
+.soil-cutaway svg { display: block; width: 100%; height: auto; }
+
+/* Transitions, not animations: the blanket reduced-motion rule at the top of
+   this file flattens them to .01ms already, so they need no extra guard. */
+.soil-topsoil, .soil-residue, .soil-water { transition: fill .6s ease, opacity .6s ease, y .6s ease, height .6s ease; }
+.soil-roots path { transition: stroke-dashoffset .5s cubic-bezier(.22,.9,.3,1), opacity .5s ease; }
+
+/* Water line breathes. Infinite, so it is in the kill-list above. */
+.soil-waterline { animation: cutaway-water-pulse 7s ease-in-out infinite; }
+@keyframes cutaway-water-pulse { 0%, 100% { opacity: .45 } 50% { opacity: .8 } }
+
+/* Topsoil leaving the field. Only runs when erosionIntensity() says so --
+   covered days and unobserved days are flatly zero, so this can never
+   invent erosion on a day the satellite never saw. */
+.soil-flecks { opacity: 0; transition: opacity .45s ease; pointer-events: none; }
+.soil-flecks[data-eroding='on'] { opacity: calc(.35 + var(--erosion, 0) * .65); }
+.soil-flecks[data-eroding='on'] rect { animation: cutaway-fleck-lift calc(3.4s - var(--erosion, 0) * 1.6s) linear infinite; animation-delay: var(--d, 0s); }
+@keyframes cutaway-fleck-lift {
+  0%   { transform: translate(0, 0); opacity: 0 }
+  12%  { opacity: .9 }
+  100% { transform: translate(var(--dx, 0), -88px); opacity: 0 }
+}
+
+.soil-labels text { fill: #fdf6e6; font: 600 9px/1 system-ui; letter-spacing: .09em; paint-order: stroke; stroke: #2a1d12; stroke-width: 2.4px; stroke-linejoin: round; }
+.soil-label-water { fill: #dcecfb !important; }
+
+/* No observation for this day: grey it and say so, never imply bare. */
+.soil-cutaway[data-unknown='on']::after { content: 'NO OBSERVATION'; position: absolute; top: 10px; left: 50%; transform: translateX(-50%); padding: 3px 10px; border-radius: 999px; background: #6b6b6bd9; color: #fff; font: 600 9px/1.6 system-ui; letter-spacing: .1em; }
+
+.soil-cutaway.is-compact { border-radius: 12px; }
+.soil-cutaway.is-compact .soil-labels { display: none; }
+
+/* The caption under the hero cutaway carries the provenance. */
+.soil-caption { margin: 8px 2px 0; color: #5f7366; font: 11px/1.5 system-ui; }
+.soil-caption strong { color: #3c5547; font-weight: 600; }
+
+/* --- The 3-way split core ------------------------------------------- */
+.split-core { max-width: 1280px; margin: 34px auto 0; padding: 0 28px; }
+.split-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-top: 16px; }
+.split-panel { display: flex; flex-direction: column; padding: 14px; border: 1px solid #dfe3d4; border-radius: 18px; background: #fffdf6; box-shadow: 0 8px 22px #4b3a1f14; }
+.split-panel.is-current { border-color: #b9c9ac; background: #f6f8ee; }
+.split-panel header { margin-bottom: 10px; min-height: 48px; }
+.split-tag { display: inline-block; margin-bottom: 4px; padding: 2px 8px; border-radius: 999px; background: #e7eedd; color: #46613f; font: 600 9px/1.6 system-ui; letter-spacing: .1em; text-transform: uppercase; }
+.split-panel.is-current .split-tag { background: #2f6b52; color: #f3faf1; }
+.split-panel h3 { margin: 0; font: 700 15px/1.2 Georgia, serif; color: #2c4b3c; }
+
+.split-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0 0; }
+.split-metrics div { min-width: 0; }
+.split-metrics dt { color: #6d7a6c; font: 600 9px/1.4 system-ui; letter-spacing: .07em; text-transform: uppercase; }
+.split-metrics dd { margin: 2px 0 0; color: #2c3b2f; font: 700 17px/1.1 Georgia, serif; font-variant-numeric: tabular-nums; }
+/* Tabular figures matter here: without them a number animating 104 -> 62
+   visibly jitters as the digit widths change. */
+.split-win { color: #1f6b43; }
+.split-metrics .split-win { color: #1f6b43; }
+.split-phases { margin: 8px 0 0; color: #6d7a6c; font: 11px/1.4 system-ui; }
+
+@media (max-width: 980px) {
+  .split-grid { grid-template-columns: 1fr; }
+  .split-core { padding: 0 16px; }
+}
+
+/* --- Storm ------------------------------------------------------------
+   Reuses the rain layer already here rather than adding a second one:
+   --storm pushes its opacity up and its fall time down. The flash is a
+   plain overlay. Both are additive, so the seasonal look is preserved. */
+.seasonal-world[data-storm='on'] .forest-rain { opacity: calc(.35 + var(--storm, 0) * .55) !important; animation-duration: calc(2.8s - var(--storm, 0) * 1.9s); }
+.forest-flash { position: absolute; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at 62% 8%, #ffffffe0 0%, #cfe4ff5c 26%, transparent 62%); }
+.seasonal-world[data-storm='on'] .forest-flash { animation: storm-flash 3.1s steps(1, end) infinite; }
+@keyframes storm-flash {
+  0%, 7%, 100% { opacity: 0 }
+  2%  { opacity: calc(var(--storm, 0) * .85) }
+  3.5%{ opacity: calc(var(--storm, 0) * .22) }
+  5%  { opacity: calc(var(--storm, 0) * .6) }
+}
+.seasonal-world[data-storm='on'] { filter: saturate(.78) brightness(calc(1 - var(--storm, 0) * .22)); transition: filter .8s ease; }
+
+.storm-run { display: inline-flex; align-items: center; gap: 7px; min-height: 36px; margin-top: 8px; padding: 0 14px; border: 1px solid #c3cdb6; border-radius: 999px; background: #fffdf6; color: #3c5547; font: 600 11px/1 system-ui; letter-spacing: .04em; cursor: pointer; transition: background .18s, border-color .18s; }
+.storm-run:hover:not(:disabled) { background: #f1f5e6; border-color: #9fb28e; }
+.storm-run:disabled { opacity: .5; cursor: default; }
+.storm-run:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
+
+/* --- Puzzle snap on the ring ---------------------------------------- */
+/* The slot glows; the piece that would land in it is solid. Transform and
+   opacity only -- the arc geometry is memoised and must not be touched. */
+.ring-slot path { transition: fill .25s ease, stroke-width .25s ease; }
+.ring-snap { filter: drop-shadow(0 0 7px #ffe89acc); animation: ring-snap-in .22s cubic-bezier(.2,1.3,.4,1) both; }
+@keyframes ring-snap-in { from { opacity: .3 } to { opacity: 1 } }
+
+/* --- The field diary -------------------------------------------------- */
+.farmer-diary { position: fixed; left: 18px; bottom: 212px; z-index: 49; width: min(300px, calc(100vw - 36px)); }
+.diary-tab { display: inline-flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 12px; border: 2px solid #8a6a45; border-radius: 3px; background: #f3e3c3; color: #5b4326; font: 600 11px/1 system-ui; letter-spacing: .04em; cursor: pointer; box-shadow: 3px 3px 0 #8a6a4559; }
+.diary-tab:hover { background: #f8ecd4; }
+.diary-tab:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
+.diary-count { display: inline-grid; place-items: center; min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px; background: #8a6a45; color: #fdf4e2; font: 700 9px/1 system-ui; }
+
+.diary-pages { margin-top: 6px; max-height: 232px; overflow-y: auto; padding: 12px 13px; border: 2px solid #8a6a45; border-radius: 3px; background: #fdf4e2 repeating-linear-gradient(transparent, transparent 21px, #c9b48f66 21px, #c9b48f66 22px); box-shadow: 3px 3px 0 #8a6a4559, 0 12px 26px #3b2a1733; }
+.diary-pages ul { margin: 0; padding: 0; list-style: none; }
+.diary-pages li { padding: 3px 0 7px; }
+.diary-pages li + li { border-top: 1px dashed #c9b48f8c; padding-top: 7px; }
+.diary-stamp { display: block; color: #9a7c52; font: 700 9px/1.6 system-ui; letter-spacing: .09em; text-transform: uppercase; }
+.diary-text { display: block; color: #44341f; font: 12.5px/1.6 Georgia, serif; }
+
+/* Ink sweeping across the page. One animated property, no timers, and the
+   text is fully present from the first frame for a screen reader. */
+.diary-pages li.is-writing .diary-text { animation: diary-ink .85s steps(26, end) both; }
+@keyframes diary-ink { from { clip-path: inset(0 100% 0 0) } to { clip-path: inset(0 0 0 0) } }
+
+@media (max-width: 860px) { .farmer-diary { display: none; } }
+
+
+/* ======================================================================
+   ZERO-SCROLL DECK  (components/SlideDeck.tsx)
+   Four full-screen acts on a horizontal track. Every slide stays mounted,
+   so the ring keeps its memoised geometry and a drag survives paging.
+   ====================================================================== */
+
+.site-shell.is-deck { height: 100dvh; overflow: hidden; display: flex; flex-direction: column; padding-bottom: 0 !important; }
+.site-shell.is-deck .topbar { flex: none; z-index: 30; }
+.site-shell.is-deck .fixture-banner { flex: none; }
+
+.deck { position: relative; flex: 1; min-height: 0; overflow: hidden; }
+.deck-track { display: flex; height: 100%; width: 100%; transition: transform .72s cubic-bezier(.65,.02,.2,1); will-change: transform; }
+.deck-track[data-reduced='on'] { transition: none; }
+.deck-slide { flex: 0 0 100%; width: 100%; height: 100%; min-width: 0; overflow: hidden; }
+
+.act-pane { display: flex; flex-direction: column; gap: 10px; height: 100%; padding: 14px clamp(14px, 2.4vw, 40px) 64px; overflow: hidden; }
+.act-head { flex: none; max-width: 980px; }
+.act-head h1 { margin: 2px 0 4px; font: 700 clamp(22px, 2.5vw, 34px)/1.08 Georgia, serif; letter-spacing: -.03em; color: #2f5241; }
+.act-head h1 em { color: #b27643; font-style: italic; }
+.act-head p { margin: 0; max-width: 78ch; color: #5a6b5c; font: 13.5px/1.5 system-ui; }
+
+.pane-grid { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1.42fr) minmax(300px, .8fr); gap: clamp(12px, 1.6vw, 26px); }
+.pane-main, .pane-side { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+/* The side rail is the one place that may scroll: it holds lists whose
+   length depends on the data, and clipping a species off the bottom would
+   hide information rather than tidy it. */
+.pane-side { overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.pane-main > .hero-world { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.pane-main > .hero-world > [role='region'] { max-height: 100%; }
+.pane-main .soil-cutaway { flex: 1; min-height: 0; display: flex; align-items: center; }
+.pane-main .soil-cutaway svg { max-height: 100%; }
+
+.pane-futures { gap: 8px; }
+.pane-futures .split-core { flex: 1; min-height: 0; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.pane-futures .split-core .section-heading { display: none; }
+.pane-futures .split-grid { flex: 1; min-height: 0; margin-top: 0; }
+.pane-futures .split-panel { overflow: hidden; }
+.pane-futures .rotation-list { flex: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+/* --- Deck navigation -------------------------------------------------- */
+.deck-nav { position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 8px 14px 10px; background: linear-gradient(transparent, #f7f6ecd9 46%); }
+.deck-nav ol { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.deck-nav ol button { display: flex; align-items: center; gap: 7px; min-height: 32px; padding: 0 12px; border: 1px solid transparent; border-radius: 999px; background: #ffffffad; color: #5d6f5f; font: 600 11px/1 system-ui; cursor: pointer; transition: background .2s, color .2s, border-color .2s; }
+.deck-nav ol button:hover { background: #fff; border-color: #c3cdb6; }
+.deck-nav ol button.is-on { background: #2f6b52; border-color: #2f6b52; color: #f3faf1; }
+.deck-nav ol button.is-done .deck-dot { background: #7fa98c; }
+.deck-dot { width: 7px; height: 7px; border-radius: 50%; background: #c3cdb6; }
+.deck-nav ol button.is-on .deck-dot { background: #f0cf87; }
+.deck-arrow { width: 34px; height: 34px; border: 1px solid #c3cdb6; border-radius: 50%; background: #fffdf6; color: #3c5547; font: 400 19px/1 system-ui; cursor: pointer; }
+.deck-arrow:disabled { opacity: .3; cursor: default; }
+.deck-nav button:focus-visible, .deck-arrow:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
+
+/* Phones get an ordinary scrolling column. A locked viewport on a small
+   screen hides content and breaks assistive scrolling, and none of these
+   panes fit in 650px of height anyway. */
+@media (max-width: 900px), (max-height: 620px) {
+  .site-shell.is-deck { height: auto; overflow: visible; }
+  .deck, .deck-slide { overflow: visible; height: auto; }
+  .deck-track { display: block; transform: none !important; }
+  .deck-slide { width: 100%; }
+  .act-pane { height: auto; overflow: visible; padding-bottom: 26px; }
+  .pane-grid { grid-template-columns: 1fr; }
+  .pane-side { overflow: visible; }
+  .pane-futures .rotation-list { grid-template-columns: 1fr; }
+  .deck-nav { position: sticky; bottom: 0; }
+}
+
+/* ======================================================================
+   SATELLITE INTRO  (components/SatelliteIntro.tsx)
+   ====================================================================== */
+
+.sat-intro { position: fixed; inset: 0; z-index: 70; overflow: hidden; background: #07140f; }
+/* The fade belongs to the END of the descent, not to a timer that starts
+   on mount -- unconditional, it wiped the start card off the screen 4.3s
+   after load whether or not anyone had pressed Begin. */
+.sat-intro.phase-gone { animation: sat-out .7s ease both; }
+.sat-intro.phase-gone { pointer-events: none; }
+@keyframes sat-out { to { opacity: 0 } }
+
+.sat-frame { position: absolute; inset: 0; background-size: cover; background-position: center; transform: scale(1); }
+/* Long and slow: it has to carry the whole narration, not a 3-second cut. */
+.sat-intro.phase-zoom .sat-frame { animation: sat-zoom 20s cubic-bezier(.4,.05,.3,1) both; }
+@keyframes sat-zoom { to { transform: scale(var(--sat-scale, 6)) } }
+
+/* A surveyor's reticle on the field, so the zoom has a target to land on. */
+.sat-reticle { position: absolute; width: 0; height: 0; }
+.sat-reticle span { position: absolute; left: -34px; top: -34px; width: 68px; height: 68px; border: 2px solid #f0cf87; border-radius: 3px; box-shadow: 0 0 0 1px #07140f80, 0 0 22px #f0cf8759; animation: sat-pulse 1.8s ease-in-out infinite; }
+@keyframes sat-pulse { 0%, 100% { opacity: .55; transform: scale(1) } 50% { opacity: 1; transform: scale(1.08) } }
+
+.sat-caption { position: absolute; left: clamp(16px, 4vw, 54px); bottom: clamp(44px, 7vh, 84px); max-width: 520px; color: #eef6ec; text-shadow: 0 2px 14px #04140fcc; }
+.sat-caption .eyebrow { color: #f0cf87; }
+.sat-caption h2 { margin: 4px 0 6px; font: 700 clamp(26px, 3.4vw, 42px)/1.05 Georgia, serif; color: #fff7de; }
+.sat-caption p { margin: 0 0 6px; font: 14px/1.5 system-ui; color: #dcebdb; }
+.sat-caption small { font: 11px/1.4 system-ui; color: #a9bfae; }
+
+
+/* The diary floats by default; Act 2 places it in the column instead. */
+.farmer-diary.is-inline { position: static; width: auto; }
+.farmer-diary.is-inline .diary-pages { max-height: none; }
+
+/* --- The farmer walking (Act 2) --------------------------------------- */
+/* One idle frame per direction and no walk cycle in the sprite pack, so
+   the walk is a translate plus a two-step bob with the side-facing sprite.
+   steps() not ease: a pixel character gliding by sub-pixel amounts looks
+   broken, and discrete hops read as footfalls. */
+.farmer-guide.is-placed { transform: translateX(var(--walk-x, 0)); transition: transform 2.2s cubic-bezier(.4,0,.5,1); }
+.farmer-guide.is-walking .farmer-sprite img { animation: farmer-step .46s steps(2, end) infinite; }
+@keyframes farmer-step { 0%, 100% { transform: translateY(0) } 50% { transform: translateY(-5px) } }
+.farmer-guide.is-walking .farmer-shadow { animation: farmer-shadow-step .46s steps(2, end) infinite; }
+@keyframes farmer-shadow-step { 0%, 100% { opacity: .45; transform: scaleX(1) } 50% { opacity: .3; transform: scaleX(.86) } }
+.farmer-guide.is-still.is-placed { transition: none; }
+
+/* Narration prompt, shown only when sound is off and a voice exists. */
+.sat-hint { margin: 2px 0 0; padding: 6px 14px; border: 1px solid #ffffff2e; border-radius: 999px; background: #0b231ca6; color: #dcebdb; font: 11px/1.4 system-ui; text-align: center; }
+
+/* ======================================================================
+   BOTTOM BAR — the farmer gets a LANE, not an overlay.
+
+   Previously he was fixed over the acts: the sprite sat on the time lever
+   and the bubble, absolutely positioned inside a shrink-to-fit parent,
+   collapsed to one word per line. Now the deck is a column — track, then
+   a real bar — and the bar is divided between the farmer and the nav.
+   Content cannot reach either, because the track simply ends above them.
+   ====================================================================== */
+
+:root { --farmer-lane: 352px; --bottom-bar: 78px; }
+
+.deck { display: flex; flex-direction: column; }
+.deck-track { flex: 1; min-height: 0; }
+.act-pane { padding-bottom: 12px; }
+
+/* The nav is a layout row now, so nothing can hide beneath it, and it is
+   inset by the farmer's lane so the two never meet. */
+.deck-nav { position: static; flex: none; height: var(--bottom-bar); padding: 0 14px 0 calc(var(--farmer-lane) + 14px); background: linear-gradient(#f7f6ec00, #f1efe2); border-top: 1px solid #e0e3d4; }
+
+/* --- the lane -------------------------------------------------------- */
+.farmer-guide { left: 0; bottom: 0; width: var(--farmer-lane); height: var(--bottom-bar); align-items: center; gap: 10px; padding: 0 10px 0 12px; flex-direction: row-reverse; justify-content: flex-end; }
+.farmer-sprite, .farmer-sprite img { width: 64px; height: 64px; }
+.farmer-shadow { bottom: 4px; width: 30px; margin-left: -15px; height: 5px; }
+
+/* In the bar the bubble is an ordinary flex child, so it gets real width
+   and reads as a line of speech rather than a stack of single words. */
+.farmer-bubble { position: static; flex: 1; min-width: 0; max-width: none; margin: 0; padding: 8px 30px 8px 11px; border-width: 2px; box-shadow: 2px 2px 0 #2f443540; }
+.farmer-bubble p { font-size: 12.5px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+/* The tail pointed down out of a floating bubble; in the bar it points
+   right, at the farmer standing beside it. */
+.farmer-bubble::before { left: auto; right: -9px; bottom: 50%; width: 11px; height: 11px; margin-bottom: -6px; border-right: 2px solid #2f4435; border-bottom: 2px solid #2f4435; border-left: 0; border-top: 0; transform: rotate(-45deg); }
+.farmer-bubble::after { display: none; }
+.farmer-guide[data-tone='warn'] .farmer-bubble::before { border-color: #8a3a24; }
+.farmer-guide[data-tone='good'] .farmer-bubble::before { border-color: #1f6b43; }
+.farmer-bubble-close { top: 4px; right: 5px; width: 18px; height: 18px; }
+
+/* --- Act two: his act, so he gets the floor ------------------------- */
+/* The pane keeps a 150px lane clear at the bottom and he stands in it at
+   full size. Nothing is overlapped because the space is reserved first. */
+.pane-desk { padding-bottom: 162px; }
+.site-shell[data-act='desk'] .farmer-guide { width: min(620px, 56vw); height: 230px; align-items: flex-end; padding-bottom: 6px; }
+.site-shell[data-act='desk'] .farmer-sprite,
+.site-shell[data-act='desk'] .farmer-sprite img { width: 192px; height: 192px; }
+.site-shell[data-act='desk'] .farmer-shadow { bottom: 14px; width: 76px; margin-left: -38px; height: 10px; }
+.site-shell[data-act='desk'] .farmer-bubble { margin-bottom: 58px; }
+
+/* --- the animated way forward ---------------------------------------- */
+.deck-next { position: absolute; right: 16px; bottom: calc(var(--bottom-bar) + 12px); z-index: 22; display: inline-flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 8px 0 18px; border: 1px solid #2f6b52; border-radius: 999px; background: #2f6b52; color: #f3faf1; cursor: pointer; box-shadow: 0 10px 24px #15402f3d; transition: background .2s, transform .2s, box-shadow .2s; }
+.deck-next:hover { background: #26604a; transform: translateY(-2px); box-shadow: 0 14px 30px #15402f52; }
+.deck-next:focus-visible { outline: 2px solid #f0cf87; outline-offset: 3px; }
+.deck-next-label { display: flex; flex-direction: column; align-items: flex-start; font: 600 13px/1.15 system-ui; }
+.deck-next-label small { color: #bfe0cb; font: 600 9px/1.4 system-ui; letter-spacing: .12em; text-transform: uppercase; }
+.deck-next-chev { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #ffffff26; font-size: 18px; animation: next-nudge 1.9s ease-in-out infinite; }
+@keyframes next-nudge { 0%, 100% { transform: translateX(0) } 50% { transform: translateX(4px) } }
+
+@media (max-width: 900px), (max-height: 620px) {
+  .deck-nav { position: sticky; bottom: 0; height: auto; padding: 8px 14px; }
+  .farmer-guide { display: none; }
+  .pane-desk { padding-bottom: 26px; }
+  .deck-next { position: static; width: 100%; margin: 10px 0 0; justify-content: center; }
+}
+
+
+/* --- Field summary inside the narrow side rail ----------------------- */
+/* The base .field-summary is a 200px-tall hero block from the old
+   full-width header. In a 300px rail that squeezed the eyebrow against
+   the top edge and clipped it. Here it is a compact two-up card. */
+.pane-side .field-summary { min-height: 0; padding: 13px 15px; border-radius: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pane-side .field-summary::after { display: none; }
+.pane-side .field-summary > div { min-width: 0; }
+.pane-side .field-summary .eyebrow { display: block; margin-bottom: 2px; font-size: 9px; letter-spacing: .1em; line-height: 1.5; }
+.pane-side .field-summary strong { margin-top: 0; font-size: 27px; line-height: 1.05; }
+.pane-side .field-summary strong small { font-size: 13px; }
+.pane-side .field-summary p { margin-top: 3px; max-width: none; font-size: 10.5px; line-height: 1.35; }
+/* Keep the headline figures in view while the packet list scrolls. */
+.pane-side .field-summary { position: sticky; top: 0; z-index: 2; }
+
+/* ======================================================================
+   THE WALK-IN  (components/FarmerIntro.tsx)
+   A zero-scroll stage between the satellite descent and the deck.
+   ====================================================================== */
+
+.farmer-intro { position: fixed; inset: 0; z-index: 68; overflow: hidden; cursor: pointer; background: #e8efe2; animation: intro-in .5s ease both; }
+@keyframes intro-in { from { opacity: 0 } to { opacity: 1 } }
+.farmer-intro:focus-visible { outline: 3px solid #f0cf87; outline-offset: -3px; }
+
+.intro-sky { position: absolute; inset: 0 0 34% 0; background: linear-gradient(180deg, #cfe3ef 0%, #e4eee0 62%, #eef3e4 100%); }
+.intro-ground { position: absolute; inset: 66% 0 0 0; background: linear-gradient(180deg, #8d7a52 0%, #6f6038 22%, #5d5330 100%); box-shadow: inset 0 2px 0 #b9a775; }
+/* Furrow lines, drawn rather than imported. */
+.intro-ground::after { content: ''; position: absolute; inset: 0; opacity: .3; background: repeating-linear-gradient(95deg, #3f3821 0 2px, transparent 2px 26px); }
+
+/* The actor walks the width of the stage, then stops at a third in. */
+.intro-actor { position: absolute; bottom: 24%; left: 0; width: 192px; height: 192px; display: grid; place-items: end center; }
+.intro-actor img { width: 192px; height: 192px; image-rendering: pixelated; image-rendering: crisp-edges; filter: drop-shadow(0 4px 0 #2a21113d); }
+.intro-shadow { position: absolute; bottom: 6px; left: 50%; width: 74px; height: 10px; margin-left: -37px; border-radius: 50%; background: #2b24128c; filter: blur(3px); }
+
+.farmer-intro.stage-walking .intro-actor { animation: intro-walk 2.4s linear forwards; }
+.farmer-intro.stage-waving .intro-actor,
+.farmer-intro.stage-talking .intro-actor { transform: translateX(clamp(60px, 22vw, 320px)); }
+@keyframes intro-walk { from { transform: translateX(-200px) } to { transform: translateX(clamp(60px, 22vw, 320px)) } }
+
+/* --- the dialogue box ------------------------------------------------- */
+.intro-dialogue { position: absolute; left: 50%; bottom: 7%; transform: translateX(-50%); width: min(760px, calc(100vw - 48px)); padding: 20px 24px 14px; border: 3px solid #2f4435; border-radius: 4px; background: #fffdf2; box-shadow: 6px 6px 0 #2f443540, 0 20px 44px #2a211126; animation: intro-box .26s steps(3, end) both; }
+@keyframes intro-box { from { opacity: 0; transform: translate(-50%, 10px) } to { opacity: 1; transform: translate(-50%, 0) } }
+.intro-dialogue p { margin: 0; min-height: 3.2em; color: #2c3b2f; font: 16px/1.62 Georgia, serif; }
+
+/* A block caret, because this is a typewriter. */
+.intro-caret { display: inline-block; width: .55em; height: 1.05em; margin-left: 2px; vertical-align: -2px; background: #2f6b52; animation: intro-caret-blink .9s steps(1, end) infinite; }
+@keyframes intro-caret-blink { 0%, 49% { opacity: 1 } 50%, 100% { opacity: 0 } }
+
+.intro-dialogue-foot { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 12px; padding-top: 10px; border-top: 1px dashed #c6cfbd; }
+.intro-pips { display: flex; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.intro-pips li { width: 8px; height: 8px; border: 2px solid #2f4435; background: #fffdf2; }
+.intro-pips li.is-done { background: #9fb79f; }
+.intro-pips li.is-on { background: #2f6b52; }
+.intro-cue { color: #6d7a6c; font: 600 11px/1 system-ui; letter-spacing: .05em; }
+
+
+@media (max-width: 760px) {
+  .intro-actor, .intro-actor img { width: 128px; height: 128px; }
+  .intro-dialogue p { font-size: 14px; }
+}
+
+/* --- Farmer writing (synced to the diary typing) ---------------------- */
+/* The hand-moving illusion is a small bob, because there is no writing
+   pose in the sprite pack -- two poses only, Idle and a raised arm. */
+.farmer-guide.is-writing .farmer-sprite img { animation: farmer-scribble .34s steps(2, end) infinite; }
+@keyframes farmer-scribble { 0%, 100% { transform: translate(0, 0) } 50% { transform: translate(2px, -2px) } }
+.farmer-guide.is-writing .farmer-bubble { border-color: #8a6a45; background: #fdf4e2; }
+.farmer-guide.is-writing .farmer-bubble::before { border-color: #8a6a45; }
+
+/* Diary inside the Field Notes drawer. */
+.notes-diary { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+.notes-diary li { padding: 9px 11px; border-left: 3px solid #8a6a45; border-radius: 0 9px 9px 0; background: #fdf4e2; color: #44341f; font: 12.5px/1.55 Georgia, serif; }
+.notes-diary .diary-stamp { display: block; margin-bottom: 2px; }
+
+/* --- Satellite intro: hold the wide shot until the descent begins ---- */
+.sat-intro:not(.phase-zoom):not(.phase-gone) .sat-frame { transform: scale(1.04); transition: transform 6s ease-out; }
+
+/* ======================================================================
+   PARALLAX FIELD  (components/seasonal/ParallaxField.tsx)
+
+   The stage is now the real field from orbit. The old backdrop was a
+   stock tropical rainforest photo standing in for Iowa corn ground --
+   the most checkable thing on the page.
+   ====================================================================== */
+
+.parallax-field { position: absolute; inset: 0; overflow: hidden; border-radius: inherit; background: #0c1b14; }
+
+/* Zoomed to about 2.5x, which frames roughly 4 km. Far enough out that
+   the section-road grid and the boundary between one farm and the next
+   read clearly, close enough that it is recognisably a field and not a
+   county. The crop geometry is real, so none is drawn. */
+.pf-terrain { position: absolute; inset: -14%; background-size: 250%; background-position: center; background-repeat: no-repeat; filter: saturate(.72) brightness(.52) contrast(1.12); transition: transform 1.1s cubic-bezier(.3,.1,.2,1), filter .9s ease; will-change: transform; }
+
+/* Parallax: each act pushes the ground a little further behind the
+   content, so moving through the story feels like moving over the land. */
+.parallax-field[data-act='0'] .pf-terrain { transform: scale(1.00) translate(0, 0); }
+.parallax-field[data-act='1'] .pf-terrain { transform: scale(1.06) translate(-2.2%, -1.2%); }
+.parallax-field[data-act='2'] .pf-terrain { transform: scale(1.12) translate(-4.4%, -2.4%); }
+.parallax-field[data-act='3'] .pf-terrain { transform: scale(1.18) translate(-6.6%, -3.6%); }
+
+/* Glass scrim. The instrument has to stay razor-sharp over real terrain,
+   and satellite imagery is visually busy at every frequency, so this is
+   a blur plus a dark wash rather than a flat tint. */
+.pf-scrim { position: absolute; inset: 0; backdrop-filter: blur(2.5px) saturate(.9); -webkit-backdrop-filter: blur(2.5px) saturate(.9); background: linear-gradient(180deg, #06140ec4 0%, #08201699 38%, #061a12cc 100%); }
+
+.pf-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.pf-vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 46%, transparent 34%, #04120c6b 82%, #04120ca8 100%); }
+
+/* Bare and eroding reads warmer and harsher; protected reads cooler and
+   calmer. The tint follows the data, not the calendar. */
+.parallax-field[data-mode='rain'] .pf-terrain { filter: saturate(.52) brightness(.4) contrast(1.2); }
+.parallax-field[data-mode='dust'] .pf-terrain { filter: saturate(.84) brightness(.58) contrast(1.05) sepia(.22); }
+.parallax-field[data-mode='calm'] .pf-terrain { filter: saturate(.86) brightness(.56) contrast(1.08); }
+
+/* The hero frame holds the terrain now, so drop the illustrated one. */
+.hero-world { background: #0c1b14; }
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-terrain { transition: none !important; }
+}
+
+/* --- Intro loader (replaces the begin gate) --------------------------- */
+.sat-loading { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 14px; color: #dcebdb; }
+.sat-loading p { margin: 0; font: 600 11px/1 system-ui; letter-spacing: .16em; text-transform: uppercase; text-shadow: 0 2px 10px #04140fcc; }
+.sat-spinner { width: 34px; height: 34px; border: 2px solid #ffffff2e; border-top-color: #f0cf87; border-radius: 50%; animation: sat-spin .9s linear infinite; }
+@keyframes sat-spin { to { transform: rotate(360deg) } }
+
+
+/* --- Entry gate ------------------------------------------------------- */
+/* One click before anything. Not a style choice: a browser will not let an
+   AudioContext make a sound before a user gesture, so without this the
+   narration is discarded and the opening plays silent. */
+.enter-gate { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 40%, #11362b 0%, #07180f 70%); }
+.enter-card { text-align: center; padding: 0 24px; animation: enter-rise .5s cubic-bezier(.2,.9,.3,1) both; }
+@keyframes enter-rise { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: none } }
+.enter-card .eyebrow { color: #8fb79c; }
+.enter-card h1 { margin: 8px 0 2px; font: 700 clamp(38px, 6vw, 68px)/1 Georgia, serif; letter-spacing: -.03em; color: #fff7de; }
+.enter-card p { margin: 0 0 26px; color: #cfe3d4; font: 15px/1.5 Georgia, serif; font-style: italic; }
+.enter-begin { min-height: 54px; padding: 0 34px; border: 2px solid #f0cf87; border-radius: 999px; background: #f0cf87; color: #26331f; font: 700 15px/1 system-ui; cursor: pointer; box-shadow: 0 16px 38px #04140f66; transition: transform .18s, background .18s, box-shadow .18s; }
+.enter-begin:hover { transform: translateY(-2px); background: #f7dc9d; box-shadow: 0 20px 46px #04140f80; }
+.enter-begin:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.enter-card small { display: block; margin-top: 14px; color: #8fb79c; font: 11px/1.4 system-ui; letter-spacing: .06em; }

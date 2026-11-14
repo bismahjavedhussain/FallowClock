@@ -1,11 +1,27 @@
 import { useEffect, useRef, useState } from 'react'
 import { seasonAtDoy, seasonWeights } from '../../lib/seasons'
+import { useStore } from '../../store'
+import { setSoundEnabled as setEngineSound } from '../../lib/sound'
 
 type Players = { wind: HTMLAudioElement; leaves: HTMLAudioElement; music: HTMLAudioElement; whoosh: HTMLAudioElement }
 const tracks = ['chill-vlog-beats', 'sunny-cafe', 'beautiful-lofi']
 
 export default function AudioAtmosphere({ doy }: { doy: number }) {
-  const [enabled, setEnabled] = useState(false)
+  // One switch drives both halves of the audio: the streamed ambience below
+  // and the synthesised interaction sounds in lib/sound.ts. Two separate
+  // mutes would be a usability trap -- people press the visible one and
+  // wonder why clicks still make noise.
+  const enabled = useStore((s) => s.soundEnabled)
+  const stage = useStore((s) => s.audioStage)
+  // Narration owns the opening. Music under a voiceover is the fastest
+  // way to make the voice unintelligible, so the bed stays silent until
+  // the brief, comes in faded under the typing, and opens up in the tool.
+  const bed = stage === 'intro' ? 0 : stage === 'brief' ? 0.38 : 1
+  const setEnabled = (next: boolean | ((v: boolean) => boolean)) => {
+    const value = typeof next === 'function' ? next(useStore.getState().soundEnabled) : next
+    setEngineSound(value)
+    useStore.getState().setSoundEnabled(value)
+  }
   const [musicEnabled, setMusicEnabled] = useState(true)
   const [ambienceVolume, setAmbienceVolume] = useState(0.28)
   const [musicVolume, setMusicVolume] = useState(0.12)
@@ -16,9 +32,9 @@ export default function AudioAtmosphere({ doy }: { doy: number }) {
   const previousSeason = useRef(season)
   const weights = seasonWeights(doy)
   target.current = {
-    wind: enabled ? ambienceVolume * (0.48 + weights.winter * 0.32 + weights.autumn * 0.15) : 0,
-    leaves: enabled ? ambienceVolume * (weights.spring * 0.4 + weights.summer * 0.55 + weights.autumn * 0.82) : 0,
-    music: enabled && musicEnabled ? musicVolume : 0,
+    wind: enabled ? bed * ambienceVolume * (0.48 + weights.winter * 0.32 + weights.autumn * 0.15) : 0,
+    leaves: enabled ? bed * ambienceVolume * (weights.spring * 0.4 + weights.summer * 0.55 + weights.autumn * 0.82) : 0,
+    music: enabled && musicEnabled ? bed * musicVolume : 0,
   }
 
   useEffect(() => {
@@ -44,8 +60,12 @@ export default function AudioAtmosphere({ doy }: { doy: number }) {
     wind.volume = leaves.volume = music.volume = 0
     wind.preload = leaves.preload = 'auto'
     players.current = { wind, leaves, music, whoosh }
-    void wind.play().catch(() => setEnabled(false))
-    void leaves.play().catch(() => setEnabled(false))
+    // If the streamed ambience cannot start -- offline, slow first load, a
+    // codec the browser refuses -- do NOT switch sound off. The interaction
+    // sounds are synthesised and need no files, so they still work, and
+    // killing them because a 1 MB mp3 stalled would be the wrong trade.
+    void wind.play().catch(() => {})
+    void leaves.play().catch(() => {})
   }, [enabled])
 
   useEffect(() => {

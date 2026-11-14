@@ -4155,7 +4155,7 @@ export type HeatStressProb = [
   number
 ];
 /**
- * SMAP, 0-1. COARSE (9-11 km) -- regional flag only, never presented as a field-scale number.
+ * Plant-available water, 0-1, from a single-layer bucket water balance driven by NASA POWER rainfall and Hargreaves-Samani reference ET. MODELLED, NOT MEASURED -- label it so in the UI. This is NOT SMAP: SMAP needs an Earthdata login and is 9-11 km, so one pixel would cover roughly 1,500 fields this size. See soilwater.py.
  *
  * @minItems 365
  * @maxItems 365
