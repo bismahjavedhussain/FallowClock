@@ -200,10 +200,27 @@ def bare_days(
     return sum(1 for v in soil_cover if v < threshold)
 
 
+#: Daily frost probability at which we call a stand killed.
+#:
+#: NOT 0.5. Calibrated empirically against Story County 2000-2024: the day
+#: a specific date reaches 50% frost probability is far later in autumn
+#: than the date most years actually see their first frost. Thresholding at
+#: 0.5 put first fall frost at DOY 314 when the true median is 288 -- a
+#: 47-day overstatement of the frost-free season once both ends are summed,
+#: which would hand every cover crop a month of growth it never gets.
+#:
+#:   threshold   last spring   first fall      true (per-year median)
+#:       0.50       DOY  90      DOY 314        DOY 111 / 288
+#:       0.20       DOY 110      DOY 294
+#:       0.10       DOY 116      DOY 284        <- closest, and matches
+#:                                                 published station normals
+KILLING_FROST_PROB = 0.10
+
+
 def first_killing_frost_doy(
     frost_prob: list[float],
     after_doy: int,
-    prob_threshold: float = 0.5,
+    prob_threshold: float = KILLING_FROST_PROB,
     search_days: int = 200,
 ) -> int | None:
     """First DOY after `after_doy` where P(frost) crosses the threshold.

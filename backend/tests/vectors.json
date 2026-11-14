@@ -2524,29 +2524,29 @@
    {
     "species_id": "cereal_rye",
     "seed_doy": 240,
-    "expect_sum": 221.3016,
-    "expect_max": 0.85,
+    "expect_sum": 139.7393,
+    "expect_max": 0.55,
     "expect_nonzero_days": 266
    },
    {
     "species_id": "forage_radish",
     "seed_doy": 240,
-    "expect_sum": 222.6499,
-    "expect_max": 0.85,
+    "expect_sum": 140.6117,
+    "expect_max": 0.55,
     "expect_nonzero_days": 266
    },
    {
     "species_id": "hairy_vetch",
     "seed_doy": 240,
-    "expect_sum": 218.4928,
-    "expect_max": 0.85,
+    "expect_sum": 137.9218,
+    "expect_max": 0.55,
     "expect_nonzero_days": 266
    },
    {
     "species_id": "oats",
     "seed_doy": 240,
-    "expect_sum": 219.9233,
-    "expect_max": 0.85,
+    "expect_sum": 138.8475,
+    "expect_max": 0.55,
     "expect_nonzero_days": 266
    }
   ],
@@ -2556,8 +2556,8 @@
     "expect_feasible": true,
     "expect_seed_doy": 240,
     "expect_gdd_available": 1133.9141,
-    "expect_delta_exposed_r": 608.1139,
-    "expect_pct_reduction": 93.2458,
+    "expect_delta_exposed_r": 443.9812,
+    "expect_pct_reduction": 68.0783,
     "expect_curve_source": "modelled"
    },
    {
@@ -2565,8 +2565,8 @@
     "expect_feasible": true,
     "expect_seed_doy": 240,
     "expect_gdd_available": 593.6825,
-    "expect_delta_exposed_r": 356.5789,
-    "expect_pct_reduction": 54.6764,
+    "expect_delta_exposed_r": 174.3774,
+    "expect_pct_reduction": 26.7383,
     "expect_curve_source": "modelled"
    },
    {
@@ -2574,8 +2574,8 @@
     "expect_feasible": true,
     "expect_seed_doy": 240,
     "expect_gdd_available": 1133.9141,
-    "expect_delta_exposed_r": 608.1139,
-    "expect_pct_reduction": 93.2458,
+    "expect_delta_exposed_r": 443.9812,
+    "expect_pct_reduction": 68.0783,
     "expect_curve_source": "modelled"
    },
    {
@@ -2592,8 +2592,8 @@
     "expect_feasible": true,
     "expect_seed_doy": 240,
     "expect_gdd_available": 593.6825,
-    "expect_delta_exposed_r": 356.5789,
-    "expect_pct_reduction": 54.6764,
+    "expect_delta_exposed_r": 174.3774,
+    "expect_pct_reduction": 26.7383,
     "expect_curve_source": "modelled"
    }
   ]

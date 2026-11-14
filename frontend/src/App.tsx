@@ -46,7 +46,16 @@ interface Bundle {
   uncertainty: { field: string; level: string; reason: string; affects: string }[]
 }
 
-const BUNDLE_URL = '/bundles/farm_synthetic.json'
+/**
+ * Real NASA POWER weather first; the pure-synthetic fixture only as a
+ * fallback so the UI still renders if the bundle has not been built.
+ * Both still set provenance.is_synthetic while B1's cover curves are
+ * placeholders, which is what drives the red banner.
+ */
+const BUNDLE_URLS = [
+  '/bundles/farm_story-county-ia.json',
+  '/bundles/farm_synthetic.json',
+]
 
 export default function App() {
   const [bundle, setBundle] = useState<Bundle | null>(null)
@@ -54,13 +63,21 @@ export default function App() {
   const { selectedRotationId, selectRotation, hoveredDoy, setHoveredDoy } = useStore()
 
   useEffect(() => {
-    fetch(BUNDLE_URL)
-      .then((r) => {
-        if (!r.ok) throw new Error(`${r.status} loading ${BUNDLE_URL}`)
-        return r.json()
-      })
-      .then(setBundle)
-      .catch((e) => setError(String(e)))
+    const load = async () => {
+      for (const url of BUNDLE_URLS) {
+        try {
+          const r = await fetch(url)
+          if (r.ok) {
+            setBundle(await r.json())
+            return
+          }
+        } catch {
+          // try the next one
+        }
+      }
+      setError(`Could not load any bundle. Tried: ${BUNDLE_URLS.join(', ')}`)
+    }
+    void load()
   }, [])
 
   const clim = bundle?.climatology

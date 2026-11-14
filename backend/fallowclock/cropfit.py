@@ -39,10 +39,20 @@ from .gaps import (
 )
 from .schema import BARE_THRESHOLD, DOY_LEN, RUSLE_B_DEFAULT, Gap, Species
 
-# Cover crops rarely reach full canopy in a fall window. A plateau below 1.0
-# keeps us from overclaiming; tune against the observed rye curve once it
-# exists, and report the value in the methods section.
-DEFAULT_PLATEAU = 0.85
+# Ceiling on cover for a MODELLED (thermal-ramp) species, i.e. one with no
+# observed or literature curve.
+#
+# Deliberately conservative, and 0.55 rather than the 0.85 we started with.
+# At 0.85 the fallback model beat every curve we had actual evidence for:
+# a generic winter-hardy species would ramp to 85% by November, hold it all
+# winter, and so out-score real cereal rye -- whose literature curve peaks
+# at 78% and only after a spring flush. The tool was recommending the
+# species it knew LEAST about, and reporting an 83% erosivity reduction
+# with zero bare days.
+#
+# A guess should never outrank evidence. Where we are modelling, we
+# under-promise.
+DEFAULT_PLATEAU = 0.55
 
 # SMAP is 9-11 km, so this is a REGIONAL go/no-go flag, never a field-scale
 # number. Seeding into a dry regional anomaly is a real failure mode.
@@ -72,6 +82,18 @@ PRE_GAP_SEEDING_DAYS = 60
 # stops discriminating.
 RESIDUE_DECAY_PER_DAY = 0.006
 RESIDUE_DECAY_FLOOR = 0.35
+
+# Every cover crop is terminated before the cash crop is planted -- sprayed,
+# rolled or tilled. Cover falls to near zero over roughly a fortnight at the
+# end of the gap.
+#
+# Leaving this out is not a detail. A modelled species held its full plateau
+# straight through to planting, right across the spring erosivity peak, and
+# so out-scored real cereal rye -- whose literature curve terminates around
+# DOY 136 because that is what actually happens in the field. The model was
+# winning by doing something no farmer can do.
+TERMINATION_DAYS = 12
+TERMINATION_RESIDUAL = 0.15
 
 
 @dataclass(frozen=True)
@@ -201,6 +223,7 @@ def thermal_ramp_curve(
     """
     curve = [0.0] * DOY_LEN
     span = doys_in_run(seed_doy - 1, gap.end_doy - 1)
+    n_span = len(span)
 
     accumulated = 0.0
     frozen_at: float | None = None
@@ -218,6 +241,14 @@ def thermal_ramp_curve(
         curve[idx] = plateau * min(1.0, accumulated / species.gdd_establish)
         if stop_growth_doy is not None and doy == stop_growth_doy:
             frozen_at = curve[idx]
+
+    # Terminate into the cash crop: ramp down over the last TERMINATION_DAYS
+    # of the gap, leaving a residual mat rather than bare ground.
+    for offset in range(min(TERMINATION_DAYS, n_span)):
+        pos = n_span - min(TERMINATION_DAYS, n_span) + offset
+        idx = span[pos]
+        frac = 1.0 - (offset + 1) / min(TERMINATION_DAYS, n_span)
+        curve[idx] = curve[idx] * max(TERMINATION_RESIDUAL, frac)
     return curve
 
 
@@ -347,6 +378,15 @@ def fit_species_in_gap(
     )
 
 
+#: Lower sorts first. "observed" means a curve measured on real nearby
+#: fields; "modelled" means our thermal ramp, which nobody has checked.
+EVIDENCE_ORDER = {"observed": 0, "literature": 1, "modelled": 2}
+
+
+def evidence_rank(result: "FitResult") -> int:
+    return EVIDENCE_ORDER.get(result.curve_source, 99)
+
+
 def rank_species_for_gap(
     species_list: list[Species],
     gap: Gap,
@@ -376,7 +416,23 @@ def rank_species_for_gap(
         )
         for sp in species_list
     ]
-    results.sort(key=lambda r: (not r.feasible, -r.delta_exposed_r))
+    # Sort: feasible first, then by EVIDENCE TIER, then by benefit.
+    #
+    # Evidence outranks magnitude on purpose. A modelled thermal ramp will
+    # often out-score a species we have a real curve for, simply because
+    # the model is a smooth idealisation and the measurement is not. Three
+    # rounds of making the model more realistic (conservative plateau,
+    # frost kill, termination) narrowed that gap without closing it, and
+    # chasing it further would just be tuning a guess until it agrees with
+    # us -- which is not evidence, it is decoration.
+    #
+    # So we show both, and we put what we can defend first. The brief asks
+    # the tool to support farmer judgment rather than replace it; a ranked
+    # list that silently promotes the least-verified option does the
+    # opposite. The UI must print the tier beside the number.
+    results.sort(
+        key=lambda r: (not r.feasible, evidence_rank(r), -r.delta_exposed_r)
+    )
     return results
 
 

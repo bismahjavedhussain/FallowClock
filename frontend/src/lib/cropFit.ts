@@ -18,7 +18,14 @@
 const DOY_LEN = 365
 export const BARE_THRESHOLD = 0.3
 export const RUSLE_B_DEFAULT = 0.035
-export const DEFAULT_PLATEAU = 0.85
+/**
+ * Ceiling on cover for a MODELLED (thermal-ramp) species — one with no
+ * observed or literature curve. Deliberately conservative: at 0.85 the
+ * fallback beat every curve we had real evidence for, so the tool
+ * recommended the species it knew least about. A guess must never outrank
+ * evidence.
+ */
+export const DEFAULT_PLATEAU = 0.55
 export const MIN_SEEDING_MOISTURE = 0.15
 
 /**
@@ -35,6 +42,15 @@ export const PRE_GAP_SEEDING_DAYS = 60
  *  a persistent mat. Without this every species scores identically. */
 export const RESIDUE_DECAY_PER_DAY = 0.006
 export const RESIDUE_DECAY_FLOOR = 0.35
+
+/**
+ * Every cover crop is terminated before the cash crop is planted. Without
+ * this a modelled species held full cover straight through the spring
+ * erosivity peak and out-scored real cereal rye, whose literature curve
+ * terminates because that is what actually happens in a field.
+ */
+export const TERMINATION_DAYS = 12
+export const TERMINATION_RESIDUAL = 0.15
 
 export interface Species {
   id: string
@@ -126,10 +142,21 @@ export function accumulateGdd(gddDaily: number[], startDoy: number, endDoy: numb
   return doysInRun(startDoy - 1, endDoy - 1).reduce((s, i) => s + gddDaily[i], 0)
 }
 
+/**
+ * Daily frost probability at which we call a stand killed.
+ *
+ * NOT 0.5. Calibrated against Story County 2000-2024: thresholding at 0.5
+ * puts first fall frost at DOY 314 when the true per-year median is 288,
+ * overstating the frost-free season by ~47 days and handing every cover
+ * crop a month of growth it never gets. 0.10 reproduces the true dates and
+ * matches published station normals.
+ */
+export const KILLING_FROST_PROB = 0.1
+
 export function firstKillingFrostDoy(
   frostProb: number[],
   afterDoy: number,
-  probThreshold = 0.5,
+  probThreshold = KILLING_FROST_PROB,
   searchDays = 200,
 ): number | null {
   for (let step = 1; step <= searchDays; step++) {
@@ -209,6 +236,15 @@ export function thermalRampCurve(
     accumulated += gddDaily[idx]
     curve[idx] = plateau * Math.min(1, accumulated / species.gdd_establish)
     if (stopGrowthDoy !== undefined && idx + 1 === stopGrowthDoy) frozenAt = curve[idx]
+  }
+
+  // Terminate into the cash crop over the last TERMINATION_DAYS of the gap.
+  const span = doysInRun(seedDoy - 1, gap.end_doy - 1)
+  const nTerm = Math.min(TERMINATION_DAYS, span.length)
+  for (let offset = 0; offset < nTerm; offset++) {
+    const idx = span[span.length - nTerm + offset]
+    const frac = 1 - (offset + 1) / nTerm
+    curve[idx] = curve[idx] * Math.max(TERMINATION_RESIDUAL, frac)
   }
   return curve
 }
@@ -318,6 +354,13 @@ export function fitSpeciesInGap(
   return best ?? lastFailure ?? base({ reason: 'No feasible seeding date' })
 }
 
+/** Lower sorts first. Observed beats literature beats our own model. */
+export const EVIDENCE_ORDER: Record<string, number> = {
+  observed: 0,
+  literature: 1,
+  modelled: 2,
+}
+
 export function rankSpeciesForGap(
   speciesList: Species[],
   gap: Gap,
@@ -327,8 +370,16 @@ export function rankSpeciesForGap(
 ): FitResult[] {
   return speciesList
     .map((sp) => fitSpeciesInGap(sp, gap, clim, observedCurves[sp.id], b))
+    // Feasible first, then EVIDENCE TIER, then benefit. Evidence outranks
+    // magnitude deliberately: a modelled thermal ramp often out-scores a
+    // species we have a real curve for, because the model is a smooth
+    // idealisation and a measurement is not. Show both, put what we can
+    // defend first, and always print the tier beside the number.
     .sort((a, x) => {
       if (a.feasible !== x.feasible) return a.feasible ? -1 : 1
+      const ra = EVIDENCE_ORDER[a.curveSource] ?? 99
+      const rx = EVIDENCE_ORDER[x.curveSource] ?? 99
+      if (ra !== rx) return ra - rx
       return x.deltaExposedR - a.deltaExposedR
     })
 }
