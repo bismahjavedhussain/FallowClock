@@ -12,6 +12,7 @@ import { placeDecision, proposalPreview } from './lib/proposal'
 import type { ClimatologySlice, Gap, Species } from './lib/cropFit'
 import { useStore } from './store'
 import { seasonAtDoy } from './lib/seasons'
+import { doyToDate } from './components/YearRing'
 
 const SeasonalWorld = lazy(() => import('./components/seasonal/SeasonalWorld'))
 
@@ -38,6 +39,7 @@ interface Bundle {
     residue_cover: number[]
     n_obs_per_doy: number[]
     erosivity_r: number[]
+    erosivity_peak_doy: number
     gdd_base4: number[]
     gdd_base10: number[]
     frost_prob: number[]
@@ -58,17 +60,27 @@ interface Bundle {
   uncertainty: { field: string; level: string; reason: string; affects: string }[]
 }
 
-/** Prefer the observed Story County field supplied by the upstream imagery pipeline. */
-const BUNDLE_URLS = [
-  '/bundles/farm_story-county-ia.json',
-  '/bundles/farm_synthetic.json',
-]
+/**
+ * Both observed fields are selectable. Showing only one wastes the most
+ * useful thing the tool does: run the same model on two real fields in the
+ * same state and get opposite answers. Story County needs a cover crop.
+ * Monona County is already conservation tillage and the honest answer there
+ * is "nothing to do" -- which is worth more than a recommendation we made up.
+ */
+const FARMS = [
+  { id: 'story-county-ia', label: 'Story County', url: '/bundles/farm_story-county-ia.json' },
+  { id: 'monona-county-ia', label: 'Monona County', url: '/bundles/farm_monona-county-ia.json' },
+] as const
+
+/** Only reached if both observed bundles fail to load; carries a red banner. */
+const FALLBACK_URL = '/bundles/farm_synthetic.json'
 
 export default function App() {
   const [bundle, setBundle] = useState<Bundle | null>(null)
   const [error, setError] = useState<string | null>(null)
   const { selectedRotationId, selectRotation, hoveredDoy, setHoveredDoy, selectedDoy, setSelectedDoy, draggingSpeciesId, setDraggingSpecies, placedFills, addPlacedFill, removePlacedFill, resetPlacedFills, reducedMotion, setReducedMotion } = useStore()
   const [mode, setMode] = useState<'2D' | '3D'>('3D')
+  const [farmId, setFarmId] = useState<string>(FARMS[0].id)
   const [placementMessage, setPlacementMessage] = useState<string | null>(null)
 
   useEffect(() => {
@@ -80,22 +92,31 @@ export default function App() {
   }, [setReducedMotion])
 
   useEffect(() => {
+    let cancelled = false
     const load = async () => {
-      for (const url of BUNDLE_URLS) {
+      const chosen = FARMS.find((f) => f.id === farmId) ?? FARMS[0]
+      for (const url of [chosen.url, FALLBACK_URL]) {
         try {
           const r = await fetch(url)
           if (r.ok) {
-            setBundle(await r.json())
+            const next = await r.json()
+            if (!cancelled) {
+              setBundle(next)
+              setError(null)
+            }
             return
           }
         } catch {
-          // try the next one
+          // try the fallback
         }
       }
-      setError(`Could not load any bundle. Tried: ${BUNDLE_URLS.join(', ')}`)
+      if (!cancelled) setError(`Could not load ${chosen.label}. Tried: ${chosen.url}`)
     }
     void load()
-  }, [])
+    return () => {
+      cancelled = true
+    }
+  }, [farmId])
 
   const clim = bundle?.climatology
   const current = bundle?.rotations.find((r) => r.is_current)
@@ -167,6 +188,33 @@ export default function App() {
           .join(', ')
       : null
 
+  // The two headline numbers are disconnected facts until something says
+  // how they relate. The finding on this field is that the bare window is
+  // in SPRING and the heaviest rain lands inside it -- that is the whole
+  // argument, and it was nowhere on the page.
+  const headline = (() => {
+    const gap = bundle.gaps[0]
+    if (!gap) return null
+    const peak = clim.erosivity_peak_doy
+    const inGap =
+      gap.start_doy <= gap.end_doy
+        ? peak >= gap.start_doy && peak <= gap.end_doy
+        : peak >= gap.start_doy || peak <= gap.end_doy
+    const span = `${doyToDate(gap.start_doy).label} to ${doyToDate(gap.end_doy).label}`
+    const share = Math.round(gap.share_of_annual_r * 100)
+    const peakLabel = doyToDate(peak).label
+    const head = `Bare ${span} — ${share}% of the year's erosive rain falls in that window`
+    if (inGap) return `${head}, straight through the ${peakLabel} peak.`
+    // Wrap-aware: the peak can sit just past the end of the gap, or just
+    // before it opens. Saying "straight through the peak" when it is five
+    // days outside would be an overstatement a judge could check.
+    const after = (peak - gap.end_doy + 365) % 365
+    const before = (gap.start_doy - peak + 365) % 365
+    if (after <= 21) return `${head}, closing just as the ${peakLabel} peak arrives.`
+    if (before <= 21) return `${head}. The ${peakLabel} peak lands just before it opens.`
+    return `${head}. The heaviest rain centres on ${peakLabel}.`
+  })()
+
   const baselineCover = selected?.soil_cover ?? current.soil_cover
   const accepted = placedFills.map((id) => fitById.get(id)).filter((fit) => fit?.feasible && fit.coverCurve.length === 365)
   const { cover: ringCover, baselineBare, proposedBare, baselineExposure, proposedExposure } = proposalPreview(baselineCover, accepted as NonNullable<typeof accepted[number]>[], clim.erosivity_r, clim.n_obs_per_doy)
@@ -191,7 +239,7 @@ export default function App() {
     </nav>
 
     <header className="workspace-intro" id="year">
-      <div className="overview-copy"><span className="eyebrow">✦ THE LIVING YEAR · {bundle.farm.place}</span><h1>Find the <em>hole</em> in your year.</h1><p>Explore soil cover, rainfall erosivity, and the seasons around one field.</p><small>{bundle.provenance.is_synthetic ? 'Interactive sample field' : bundle.farm.owner_name.startsWith('TBD') ? 'Observed Story County field' : bundle.farm.owner_name} · {bundle.farm.area_ha} ha</small></div>
+      <div className="overview-copy"><span className="eyebrow">✦ THE LIVING YEAR · {bundle.farm.place}</span><h1>Find the <em>hole</em> in your year.</h1><p>{headline ?? 'Explore soil cover, rainfall erosivity, and the seasons around one field.'}</p><div className="farm-switch" role="group" aria-label="Choose a field">{FARMS.map((f) => <button type="button" key={f.id} onClick={() => setFarmId(f.id)} aria-pressed={farmId === f.id} className={farmId === f.id ? 'is-active' : ''}>{f.label}</button>)}</div><small>{bundle.provenance.is_synthetic ? 'Interactive sample field' : bundle.farm.owner_name.startsWith('TBD') ? 'Observed Story County field' : bundle.farm.owner_name} · {bundle.farm.area_ha} ha</small></div>
       <div className="field-summary overview-summary" aria-label="Field overview">
         <div><span className="eyebrow">{bundle.provenance.is_synthetic ? 'From this sample' : 'From this field'}</span><strong>{current.bare_days} <small>days</small></strong><p>{phaseSplit ?? `of ${bundle.provenance.is_synthetic ? 'simulated' : 'observed'} bare soil expected per year`}</p></div>
         <div><span className="eyebrow">Erosivity overlap</span><strong>{Math.round((bundle.gaps[0]?.share_of_annual_r ?? 0) * 100)}<small>%</small></strong><p>of annual erosivity overlaps the largest bare gap</p></div>

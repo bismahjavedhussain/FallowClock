@@ -2659,6 +2659,10 @@ export type ErosivityR = [
   number
 ];
 /**
+ * Centre DOY of the heaviest 30-day erosivity window, wrap-aware. Computed here rather than in the client because a single-day argmax picks the wrong month -- it returned late August for Monona when the real peak is May -- and a windowed, wrapping calculation is not something to duplicate and keep in sync.
+ */
+export type ErosivityPeakDoy = number;
+/**
  * Daily GDD, base 4 C (cool-season)
  *
  * @minItems 365
@@ -5823,6 +5827,7 @@ export interface Climatology {
   soil_cover: SoilCover;
   n_obs_per_doy: NObsPerDoy;
   erosivity_r: ErosivityR;
+  erosivity_peak_doy: ErosivityPeakDoy;
   gdd_base4: GddBase4;
   gdd_base10: GddBase10;
   frost_prob: FrostProb;

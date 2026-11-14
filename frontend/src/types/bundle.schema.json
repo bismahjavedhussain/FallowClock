@@ -72,6 +72,13 @@
           "title": "Erosivity R",
           "type": "array"
         },
+        "erosivity_peak_doy": {
+          "description": "Centre DOY of the heaviest 30-day erosivity window, wrap-aware. Computed here rather than in the client because a single-day argmax picks the wrong month -- it returned late August for Monona when the real peak is May -- and a windowed, wrapping calculation is not something to duplicate and keep in sync.",
+          "maximum": 365,
+          "minimum": 1,
+          "title": "Erosivity Peak Doy",
+          "type": "integer"
+        },
         "gdd_base4": {
           "description": "Daily GDD, base 4 C (cool-season)",
           "items": {
@@ -152,6 +159,7 @@
         "soil_cover",
         "n_obs_per_doy",
         "erosivity_r",
+        "erosivity_peak_doy",
         "gdd_base4",
         "gdd_base10",
         "frost_prob",

@@ -20,7 +20,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .cropfit import load_species
-from .erosivity import build_erosivity, calibrate_a
+from .erosivity import build_erosivity, calibrate_a, peak_window_doy
 from .erosivity import uncertainty_note as erosivity_note
 from .gaps import build_gaps
 from .rotations import build_standard_rotations
@@ -316,6 +316,7 @@ def assemble(
             soil_cover=soil_cover,
             n_obs_per_doy=imagery.n_obs_per_doy,
             erosivity_r=erosivity.per_doy_r,
+            erosivity_peak_doy=peak_window_doy(erosivity.per_doy_r),
             gdd_base4=weather.gdd_base4,
             gdd_base10=weather.gdd_base10,
             frost_prob=weather.frost_prob,

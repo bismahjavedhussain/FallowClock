@@ -459,3 +459,11 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
    day can read covered while still sitting inside a gap that is bare in one
    phase of the rotation. Say so rather than letting the two look contradictory. */
 .phase-caption { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #acc9b36b; color: #5c6f62; }
+
+/* Field switcher. Both observed fields matter: one needs a cover crop, the
+   other does not, and being able to show both is the point. */
+.farm-switch { display: inline-flex; gap: 4px; margin-top: 8px; padding: 3px; border-radius: 999px; background: #ffffff1f; border: 1px solid #ffffff38; }
+.farm-switch button { min-height: 32px; padding: 5px 14px; border: 0; border-radius: 999px; background: transparent; color: #eaf6ef; font: 600 11px/1 system-ui; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; transition: background .18s, color .18s; }
+.farm-switch button:hover { background: #ffffff24; }
+.farm-switch button.is-active { background: #f6f8ee; color: #1b5e4a; }
+.farm-switch button:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }

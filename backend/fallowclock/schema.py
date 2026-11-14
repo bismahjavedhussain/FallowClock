@@ -112,6 +112,13 @@ class Climatology(Strict):
     erosivity_r: DoyFloats = Field(
         description="Per-DOY mean rainfall erosivity, MJ.mm/ha/h."
     )
+    erosivity_peak_doy: Doy = Field(
+        description="Centre DOY of the heaviest 30-day erosivity window, "
+        "wrap-aware. Computed here rather than in the client because a "
+        "single-day argmax picks the wrong month -- it returned late August "
+        "for Monona when the real peak is May -- and a windowed, wrapping "
+        "calculation is not something to duplicate and keep in sync.",
+    )
     gdd_base4: DoyFloats = Field(description="Daily GDD, base 4 C (cool-season)")
     gdd_base10: DoyFloats = Field(description="Daily GDD, base 10 C (warm-season)")
     frost_prob: DoyFloats = Field(description="P(Tmin < 0 C)")

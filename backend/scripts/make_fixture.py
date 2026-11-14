@@ -27,6 +27,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from fallowclock.erosivity import peak_window_doy  # noqa: E402
 from fallowclock.gaps import bare_days, build_gaps, exposed_erosivity  # noqa: E402
 from fallowclock.schema import (  # noqa: E402
     DOY_LEN,
@@ -315,6 +316,7 @@ def build() -> Bundle:
             soil_cover=soil_cover,
             n_obs_per_doy=n_obs,
             erosivity_r=erosivity,
+            erosivity_peak_doy=peak_window_doy(erosivity),
             gdd_base4=gdd4,
             gdd_base10=gdd10,
             frost_prob=frost,
