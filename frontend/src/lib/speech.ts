@@ -96,6 +96,42 @@ export interface SpeechPart {
 }
 
 let scriptTimer = 0
+/** Fires if a clause's onend never arrives. See WATCHDOG below. */
+let watchdogTimer = 0
+
+/**
+ * Roughly how long a clause will take, in ms, generously.
+ *
+ * WATCHDOG. Chrome's speechSynthesis drops `onend` -- after a cancel(),
+ * when a tab is backgrounded, and sometimes for no reason at all. The
+ * chain here is driven BY onend, so one dropped event used to end the
+ * narration silently: you heard the opening line and then nothing, and
+ * the only thing that eventually moved the film on was the caller's
+ * 26-second safety net.
+ *
+ * So every clause also arms a timer. Whichever arrives first, the real
+ * onend or this, advances the script exactly once. Deliberately slack --
+ * about 2.2x a normal speaking rate plus a second -- because cutting a
+ * clause off early is worse than a beat of extra silence.
+ */
+function clauseBudgetMs(text: string, rate: number): number {
+  const words = Math.max(1, text.trim().split(/\s+/).length)
+  return 1000 + (words / Math.max(0.5, rate)) * 600
+}
+/**
+ * Which script run is the live one.
+ *
+ * speakScript chains its clauses through onend, so the chain is a closure
+ * that outlives the call. Two calls therefore used to leave TWO chains
+ * running against one shared scriptTimer: each spoke its own clauses, each
+ * overwrote the other's pending timer, and cancelSpeech could only clear
+ * whichever timer happened to be last. What you heard was the opening
+ * line spoken, cut off, and spoken again -- "Monona County, Iowa, Loess
+ * Hills" twice before the rest of the script settled down.
+ *
+ * Every run takes a ticket. A chain whose ticket is stale stops dead.
+ */
+let scriptGeneration = 0
 
 /**
  * Speak a scripted sequence of clauses.
@@ -129,9 +165,13 @@ export function speakScript(
     return
   }
   cancelSpeech()
+  const generation = ++scriptGeneration
 
   let i = 0
   const next = () => {
+    // Superseded by a later call, or cancelled outright. Say nothing more
+    // and do not fire onEnd: the run that replaced this one owns that.
+    if (generation !== scriptGeneration) return
     if (i >= parts.length) {
       onEnd?.()
       return
@@ -148,17 +188,27 @@ export function speakScript(
       const base = hasMaleVoice() ? pitch : Math.max(0.1, pitch - 0.25)
       utter.pitch = Math.max(0.1, base * (part.pitch ?? 1))
       utter.volume = volume
-      utter.onend = () => {
+      // Exactly one of onend, onerror and the watchdog may advance the
+      // script. Without this latch a late onend and a fired watchdog
+      // would both call next() and the script would skip a clause.
+      let advanced = false
+      const advance = (delay: number) => {
+        if (advanced || generation !== scriptGeneration) return
+        advanced = true
+        window.clearTimeout(watchdogTimer)
         window.clearTimeout(scriptTimer)
-        scriptTimer = window.setTimeout(next, part.pauseMs ?? 0)
+        scriptTimer = window.setTimeout(next, delay)
       }
-      // If the engine never fires onend (it happens on some Linux voices)
-      // the script would stall, so fall forward on a generous estimate.
-      utter.onerror = () => {
-        window.clearTimeout(scriptTimer)
-        scriptTimer = window.setTimeout(next, 150)
-      }
+
+      utter.onend = () => advance(part.pauseMs ?? 0)
+      utter.onerror = () => advance(150)
+
       synth.speak(utter)
+      window.clearTimeout(watchdogTimer)
+      watchdogTimer = window.setTimeout(
+        () => advance(0),
+        clauseBudgetMs(part.text, rate * (part.rate ?? 1)),
+      )
     } catch {
       next()
     }
@@ -167,10 +217,15 @@ export function speakScript(
 }
 
 export function cancelSpeech(): void {
+  // Retire whatever chain is running. synth.cancel() alone is not enough:
+  // it is asynchronous in Chrome, and an utterance already in flight can
+  // still fire onend afterwards and schedule the next clause.
+  scriptGeneration += 1
   // A platform with no speech engine may also be a bare stub, so do not
   // assume clearTimeout exists just because window does.
   if (typeof window !== 'undefined' && typeof window.clearTimeout === 'function') {
     window.clearTimeout(scriptTimer)
+    window.clearTimeout(watchdogTimer)
   }
   if (!speechAvailable()) return
   try {

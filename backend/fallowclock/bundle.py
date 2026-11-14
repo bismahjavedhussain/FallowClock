@@ -20,7 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from .cropfit import load_species
-from .erosivity import build_erosivity, calibrate_a, peak_window_doy
+from .erosivity import DEFAULT_A, DEFAULT_B, build_erosivity, calibrate_a, peak_window_doy
+from .trends import build_trends
 from .erosivity import uncertainty_note as erosivity_note
 from .gaps import build_gaps
 from .rotations import build_standard_rotations
@@ -241,6 +242,19 @@ def assemble(
     gaps = build_gaps(
         soil_cover, erosivity.per_doy_r, phase_covers=imagery.phase_covers
     )
+    # How the weather this field has to cope with has moved across the
+    # record. Fitted on the SAME erosivity calibration the bundle ships,
+    # and against the largest gap, so the share metric is this field's
+    # bare window rather than a generic season.
+    main_gap = gaps[0] if gaps else None
+    trends = build_trends(
+        records,
+        a=a if a else DEFAULT_A,
+        b=DEFAULT_B,
+        gap_start_doy=main_gap.start_doy if main_gap else None,
+        gap_end_doy=main_gap.end_doy if main_gap else None,
+    )
+
     species = load_species(species_csv or DATA_DIR / "species.csv")
 
     # Nothing can be drilled into a field with a crop still standing on it.
@@ -334,6 +348,7 @@ def assemble(
         species=species,
         rotations=rotations,
         uncertainty=uncertainty,
+        trends=[t.as_dict() for t in trends],
     )
     # Re-validate the serialised form: catches anything model construction
     # let through that JSON round-tripping would not.

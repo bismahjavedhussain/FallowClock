@@ -100,6 +100,27 @@ export default function FarmerIntro({
     return clearTimers
   }, [reducedMotion, active])
 
+  /**
+   * The stage machine must always arrive at 'talking'.
+   *
+   * The walk-in above is a one-shot pair of timers living in a shared
+   * array that clearTimers() empties wholesale. If `active` drops while
+   * they are pending -- which a stray reset upstream can do -- the
+   * cleanup kills them and the re-run returns early at `!active`.
+   * Nothing re-arms them, so the farmer stands on screen with no text
+   * box and no way forward, because the dialogue only renders at
+   * 'talking'. That is a dead end in the middle of the opening.
+   *
+   * This re-checks whenever `active` or `stage` changes and keeps its
+   * own timer, so the walk can be interrupted any number of times and
+   * the brief still starts.
+   */
+  useEffect(() => {
+    if (!active || stage === 'talking') return
+    const id = window.setTimeout(() => setStage('talking'), 4200)
+    return () => window.clearTimeout(id)
+  }, [active, stage])
+
   // The two-frame walk cycle: swap poses while the stride is running.
   useEffect(() => {
     if (stage !== 'walking' || reducedMotion || !active) return
@@ -134,12 +155,30 @@ export default function FarmerIntro({
     }
   }, [stage, beat, text, reducedMotion, active])
 
+  /**
+    * True only while THIS component is the one speaking.
+    *
+    * cancelSpeech is a global kill switch, and this component is mounted
+    * UNDERNEATH the satellite descent -- deliberately, so the deck never
+    * flashes through during the cross-fade. That means its cleanups fire
+    * while the descent's narration is mid-sentence. Cancelling speech it
+    * did not start is how the opening line got cut off with the rest of
+    * the script never heard.
+    */
+  const speaking = useRef(false)
+  const stopOwnSpeech = useCallback(() => {
+    if (!speaking.current) return
+    speaking.current = false
+    cancelSpeech()
+  }, [])
+
   // Read the line aloud too, when sound is on.
   useEffect(() => {
     if (stage !== 'talking' || !soundOn || !text || !active) return
+    speaking.current = true
     speak(text, { rate: 0.98, volume: 0.85 })
-    return cancelSpeech
-  }, [stage, beat, text, soundOn, active])
+    return stopOwnSpeech
+  }, [stage, beat, text, soundOn, active, stopOwnSpeech])
 
   /** Stop typing and show the whole line at once. */
   const finishLine = useCallback(() => {
@@ -165,7 +204,7 @@ export default function FarmerIntro({
       finishLine()
       return
     }
-    cancelSpeech()
+    stopOwnSpeech()
     if (last) onDone()
     else setBeat((b) => b + 1)
   }, [stage, done, last, finishLine, onDone])
@@ -181,7 +220,47 @@ export default function FarmerIntro({
     return () => window.removeEventListener('keydown', onKey)
   }, [advance, onDone])
 
-  useEffect(() => cancelSpeech, [])
+  /**
+   * A pointer press ANYWHERE advances, caught on the window in the
+   * capture phase.
+   *
+   * The root div already has onClick, but that only fires if the press
+   * and release both land on it and nothing in between swallows the
+   * event. This overlay has a lazy Suspense boundary and a canvas under
+   * it, so a click can be lost -- and a lost click on the last beat is a
+   * dead end with no way out of the app. Capture phase runs before any
+   * child handler, and `pointerdown` fires earlier than `click`, so this
+   * cannot be intercepted.
+   */
+  useEffect(() => {
+    if (!active) return
+    const onDown = () => advance()
+    window.addEventListener('pointerdown', onDown, true)
+    return () => window.removeEventListener('pointerdown', onDown, true)
+  }, [active, advance])
+
+  // Guard against a beat index running past the end, whatever the cause.
+  // text would become '' and the box would show a blank line.
+  useEffect(() => {
+    if (beat > beats.length - 1 && beats.length) setBeat(beats.length - 1)
+  }, [beat, beats.length])
+
+  /**
+   * Last resort. If the final line has been sitting fully typed for this
+   * long with no input, hand off anyway.
+   *
+   * The descent already has a safety net for the same reason -- a film
+   * that cannot be left is worse than one that ends early. Long enough
+   * that nobody reading is interrupted; short enough that a stuck screen
+   * is an annoyance rather than the end of the demo.
+   */
+  useEffect(() => {
+    if (!active || !last || !done) return
+    const id = window.setTimeout(onDone, 30000)
+    return () => window.clearTimeout(id)
+  }, [active, last, done, onDone])
+
+  useEffect(() => stopOwnSpeech, [stopOwnSpeech])
 
   const weather = WEATHER[beats[beat]?.id ?? ''] ?? { mode: 'calm' as FieldMode, intensity: 0.3 }
 
@@ -192,7 +271,9 @@ export default function FarmerIntro({
   return (
     <div
       className={`farmer-intro stage-${stage}`}
-      onClick={advance}
+      /* No onClick here. The window pointerdown listener above already
+         catches every press in the capture phase; having both meant one
+         click fired advance twice and skipped a beat. */
       role="button"
       tabIndex={0}
       aria-label="Introduction. Click or press Space to continue."

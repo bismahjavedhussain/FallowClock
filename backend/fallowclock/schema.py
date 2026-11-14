@@ -322,6 +322,61 @@ class Uncertainty(Strict):
 # --------------------------------------------------------------------------
 
 
+class ClimateTrend(Strict):
+    """One metric fitted across whole years of the NASA POWER record.
+
+    The challenge is called Field Shift, and a 25-year climatology cannot
+    answer whether anything is shifting -- it is the average that hides
+    it. These are the trends that record can honestly carry.
+
+    Note what is NOT here: a trend in bare days. Cover comes from about
+    seventy clear satellite looks a year, so a per-year cover curve would
+    be mostly interpolation and its trend would track cloud as much as
+    cropping. The weather is one source, one point, every year equally
+    observed, so only the weather is trended.
+
+    `significant` is the only field a headline may read. `slope_per_decade`
+    on a flat series is noise with a sign, and several of these ARE flat --
+    which is itself a finding and is reported as one.
+    """
+
+    metric: str = Field(description="e.g. first_fall_frost_doy")
+    unit: str
+    years: list[int] = Field(min_length=2, description="One per fitted year, ascending.")
+    values: list[float] = Field(min_length=2, description="Same order as years.")
+    slope_per_decade: float = Field(
+        description="Theil-Sen slope, median of pairwise slopes, per decade. Robust to one odd year."
+    )
+    p_value: float = Field(ge=0.0, le=1.0, description="Mann-Kendall two-sided, rank based, no distribution assumed.")
+    significant: bool = Field(description="p < 0.05.")
+    direction: Literal["earlier", "later", "up", "down", "flat"] = Field(
+        description="'flat' whenever not significant, so a null cannot be read as a direction."
+    )
+
+    @model_validator(mode="after")
+    def _series_lines_up(self) -> ClimateTrend:
+        if len(self.years) != len(self.values):
+            raise ValueError(
+                f"years has {len(self.years)} entries and values has {len(self.values)}; "
+                "a trend must carry the series it was fitted to."
+            )
+        if self.years != sorted(self.years):
+            raise ValueError("years must ascend")
+        return self
+
+    @model_validator(mode="after")
+    def _flat_means_not_significant(self) -> ClimateTrend:
+        """A direction on a null result is the exact dishonesty this guards."""
+        if self.significant and self.direction == "flat":
+            raise ValueError("A significant trend must state its direction, not 'flat'.")
+        if not self.significant and self.direction != "flat":
+            raise ValueError(
+                f"direction={self.direction!r} on a non-significant trend (p={self.p_value}). "
+                "Not significant must read as 'flat'."
+            )
+        return self
+
+
 class Bundle(Strict):
     schema_version: Literal["1.0"] = SCHEMA_VERSION
     farm: Farm
@@ -333,6 +388,10 @@ class Bundle(Strict):
     species: list[Species] = Field(min_length=1)
     rotations: list[Rotation] = Field(min_length=2)
     uncertainty: list[Uncertainty] = Field(min_length=1)
+    trends: list[ClimateTrend] = Field(
+        default_factory=list,
+        description="How the weather this field must cope with has moved across the record.",
+    )
 
     @model_validator(mode="after")
     def _exactly_one_current_rotation(self) -> Bundle:

@@ -54,16 +54,19 @@ export default function SatelliteIntro({
   const timers = useRef<number[]>([])
   const handedOff = useRef(false)
 
+  /** True once the narration has been started. It never restarts. */
+  const started = useRef(false)
+
   /**
-   * TESTING AFFORDANCE — click anywhere to skip the descent.
+   * Click anywhere to move on.
    *
-   * Added on request so the opening does not have to be sat through on
-   * every reload while the rest of the app is being worked on. There is
-   * deliberately no visible control, because the intro is meant to be
-   * unavoidable for a judge.
+   * Reinstated on request after being removed. No visible control: the
+   * descent is still the default path and nothing advertises an exit,
+   * but a viewer who has seen it -- or a judge who needs the tool rather
+   * than the film -- is not held for twenty-two seconds.
    *
-   * REMOVE BEFORE SUBMISSION: delete this callback and the onClick on the
-   * root element below. Nothing else depends on it.
+   * It hands off through the same path the narration's own ending uses,
+   * so the cross-fade and the brief behave identically either way.
    */
   const skip = useCallback(() => {
     if (handedOff.current) return
@@ -101,12 +104,26 @@ export default function SatelliteIntro({
     }
   }, [chip, farmId])
 
+  // Unmount only. Tearing the speech down belongs here and NOT in the
+  // cleanup of the effect below, because that cleanup also runs between
+  // re-runs -- which is exactly how a half-spoken line got cancelled and
+  // replayed.
+  useEffect(() => () => {
+    cancelSpeech()
+    timers.current.forEach((id) => window.clearTimeout(id))
+    timers.current = []
+  }, [])
+
   useEffect(() => {
     if (!chip || !ready) return
     if (reducedMotion) {
       onDone()
       return
     }
+    // Already running. Leave it alone: re-running from here would cut the
+    // voice off mid-sentence and start the script over.
+    if (started.current) return
+    started.current = true
     const t = timers.current
     const handOff = () => {
       if (handedOff.current) return
@@ -139,14 +156,24 @@ export default function SatelliteIntro({
     // Safety net: if the engine never reports the end -- muted tab, a
     // voice that drops onend, autoplay refusal -- the film still moves on.
     t.push(window.setTimeout(handOff, 26000))
-    return () => {
-      t.forEach((id) => window.clearTimeout(id))
-      timers.current = []
-      cancelSpeech()
-    }
   }, [chip, ready, reducedMotion, onDone, place, areaHa, rotationLabel, bareDays])
 
-  if (!chip || reducedMotion) return null
+  if (reducedMotion) return null
+
+  // THE DECK IS ALWAYS MOUNTED UNDERNEATH. Returning null here while the
+  // chip JSON is still in flight left nothing covering it, so clicking
+  // Begin flashed Act one for a frame before the descent appeared. Same
+  // fault the farmer brief had at the other end of the cross-fade.
+  //
+  // Hold the frame instead: the full-screen dark plate renders from the
+  // moment this mounts, and the imagery drops into it when it arrives.
+  if (!chip) {
+    return (
+      <div className="sat-intro phase-wide sat-waiting" role="presentation">
+        <span className="sat-waiting-mark" aria-hidden="true" />
+      </div>
+    )
+  }
 
   const { x0, x1, y0, y1 } = chip.field
   const cx = ((x0 + x1) / 2) * 100
@@ -160,7 +187,6 @@ export default function SatelliteIntro({
     <div
       className={`sat-intro phase-${phase}`}
       role="presentation"
-      /* TESTING: click anywhere to skip. Remove with the `skip` callback. */
       onClick={skip}
     >
       <div

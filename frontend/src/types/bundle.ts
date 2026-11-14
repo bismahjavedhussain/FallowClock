@@ -5778,6 +5778,43 @@ export type Reason = string;
  * What a farmer should do about it
  */
 export type Affects = string;
+/**
+ * e.g. first_fall_frost_doy
+ */
+export type Metric = string;
+export type Unit = string;
+/**
+ * One per fitted year, ascending.
+ *
+ * @minItems 2
+ */
+export type Years1 = [number, number, ...number[]];
+/**
+ * Same order as years.
+ *
+ * @minItems 2
+ */
+export type Values = [number, number, ...number[]];
+/**
+ * Theil-Sen slope, median of pairwise slopes, per decade. Robust to one odd year.
+ */
+export type SlopePerDecade = number;
+/**
+ * Mann-Kendall two-sided, rank based, no distribution assumed.
+ */
+export type PValue = number;
+/**
+ * p < 0.05.
+ */
+export type Significant = boolean;
+/**
+ * 'flat' whenever not significant, so a null cannot be read as a direction.
+ */
+export type Direction = "earlier" | "later" | "up" | "down" | "flat";
+/**
+ * How the weather this field must cope with has moved across the record.
+ */
+export type Trends = ClimateTrend[];
 
 export interface Bundle {
   schema_version?: SchemaVersion;
@@ -5790,6 +5827,7 @@ export interface Bundle {
   species: Species;
   rotations: Rotations;
   uncertainty: Uncertainty;
+  trends?: Trends;
 }
 export interface Farm {
   id: Id;
@@ -5913,4 +5951,31 @@ export interface Uncertainty1 {
   level: Level;
   reason: Reason;
   affects: Affects;
+}
+/**
+ * One metric fitted across whole years of the NASA POWER record.
+ *
+ * The challenge is called Field Shift, and a 25-year climatology cannot
+ * answer whether anything is shifting -- it is the average that hides
+ * it. These are the trends that record can honestly carry.
+ *
+ * Note what is NOT here: a trend in bare days. Cover comes from about
+ * seventy clear satellite looks a year, so a per-year cover curve would
+ * be mostly interpolation and its trend would track cloud as much as
+ * cropping. The weather is one source, one point, every year equally
+ * observed, so only the weather is trended.
+ *
+ * `significant` is the only field a headline may read. `slope_per_decade`
+ * on a flat series is noise with a sign, and several of these ARE flat --
+ * which is itself a finding and is reported as one.
+ */
+export interface ClimateTrend {
+  metric: Metric;
+  unit: Unit;
+  years: Years1;
+  values: Values;
+  slope_per_decade: SlopePerDecade;
+  p_value: PValue;
+  significant: Significant;
+  direction: Direction;
 }

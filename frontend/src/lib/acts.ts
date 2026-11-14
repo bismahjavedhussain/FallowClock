@@ -186,9 +186,16 @@ export function introNarration(i: IntroInput): string {
  *
  * THE PAUSE NUMBERS LOOK SHORT ON PURPOSE. They are added ON TOP of the
  * silence each utterance already ends with and the engine's own latency
- * starting the next one, so the gap you hear is roughly double what is
+ * starting the next one, so the gap you HEAR is roughly double what is
  * written here. At 400-600ms it stopped sounding like speech and started
  * sounding like buffering.
+ *
+ * Halved again on 15 Nov: even at these numbers the delivery dragged
+ * between sentences. Total explicit pause is now about 0.5s across the
+ * whole script, down from 1.2s, which takes roughly a second and a half
+ * off the perceived running time. The RELATIVE weighting is kept -- the
+ * longest beat is still the silence before the bare-days figure, because
+ * that is the line the whole descent exists to land.
  */
 export function introNarrationParts(i: IntroInput): { text: string; rate?: number; pitch?: number; pauseMs?: number }[] {
   const crop = i.rotationLabel.split(',')[0].replace(/-/g, ' and ').toLowerCase()
@@ -197,26 +204,26 @@ export function introNarrationParts(i: IntroInput): { text: string; rate?: numbe
 
   return [
     // Establish. Slow and low -- this is the title card.
-    { text: `${spokenPlace}.`, rate: 0.9, pitch: 0.96, pauseMs: 170 },
-    { text: `A ${Math.round(i.areaHa)} hectare ${crop} field.`, rate: 0.97, pauseMs: 200 },
+    { text: `${spokenPlace}.`, rate: 0.9, pitch: 0.96, pauseMs: 70 },
+    { text: `A ${Math.round(i.areaHa)} hectare ${crop} field.`, rate: 0.97, pauseMs: 80 },
 
     // Provenance, brisker: supporting detail, not the headline.
     {
       text: `This is how it looked from Sentinel 2, at ${Math.round(i.resolutionM)} metres per pixel.`,
       rate: 1.06,
-      pauseMs: 240,
+      pauseMs: 100,
     },
 
     // The turn. A beat of silence, then the claim, slowed and dropped.
     covered
-      ? { text: 'We chose it because it is already well protected.', rate: 0.93, pitch: 0.95, pauseMs: 140 }
-      : { text: 'We chose it for one reason.', rate: 0.95, pitch: 0.96, pauseMs: 220 },
+      ? { text: 'We chose it because it is already well protected.', rate: 0.93, pitch: 0.95, pauseMs: 60 }
+      : { text: 'We chose it for one reason.', rate: 0.95, pitch: 0.96, pauseMs: 95 },
     covered
-      ? { text: 'A tool worth trusting has to be able to say so.', rate: 0.98, pauseMs: 230 }
-      : { text: `Its soil sits bare for about ${i.bareDays} days a year.`, rate: 0.88, pitch: 0.94, pauseMs: 260 },
+      ? { text: 'A tool worth trusting has to be able to say so.', rate: 0.98, pauseMs: 95 }
+      : { text: `Its soil sits bare for about ${i.bareDays} days a year.`, rate: 0.88, pitch: 0.94, pauseMs: 110 },
 
     // Lift and go.
-    { text: 'Now we go down to the ground,', rate: 1.04, pauseMs: 80 },
+    { text: 'Now we go down to the ground,', rate: 1.04, pauseMs: 35 },
     { text: 'and walk through that year, one day at a time.', rate: 1.0, pitch: 0.97, pauseMs: 0 },
   ]
 }

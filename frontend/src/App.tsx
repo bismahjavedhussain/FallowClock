@@ -7,6 +7,8 @@ import CropPlanner from './components/CropPlanner'
 import AudioAtmosphere from './components/seasonal/AudioAtmosphere'
 import AtmosphereReadout from './components/seasonal/AtmosphereReadout'
 import PhaseYearChart from './components/PhaseYearChart'
+import ShiftReadout from './components/ShiftReadout'
+import type { ClimateTrend } from './types/bundle'
 import FarmerGuide from './components/FarmerGuide'
 import FieldNotes from './components/FieldNotes'
 import SoilCutaway from './components/soil/SoilCutaway'
@@ -82,6 +84,8 @@ interface Bundle {
   rotations: Rotation[]
   crop_curves: Record<string, { green_cover: number[]; n_fields: number; detection: string; source?: string }>
   uncertainty: { field: string; level: string; reason: string; affects: string }[]
+  /** How the weather has moved across the record. See lib trends. */
+  trends?: ClimateTrend[]
 }
 
 /**
@@ -195,9 +199,15 @@ export default function App() {
     // Switching fields has to rewrite everything, the session included.
     setDiary([])
     setWriting(false)
-    resetPlacedFills()
-    selectRotation(null)
-  }, [farmId, resetPlacedFills, selectRotation])
+    // Reached through getState() rather than the destructured actions.
+    // Listing those in the deps made this effect's identity depend on the
+    // store, and this effect RESETS THE WHOLE INTRO -- introDone,
+    // briefDone, the slide. One stray re-run mid-brief tears the user
+    // back to the start of a sequence they cannot then finish. The only
+    // thing that may retrigger a session reset is the farm changing.
+    useStore.getState().resetPlacedFills()
+    useStore.getState().selectRotation(null)
+  }, [farmId])
 
   const clim = bundle?.climatology
   const current = bundle?.rotations.find((r) => r.is_current)
@@ -500,6 +510,9 @@ export default function App() {
     className="site-shell is-deck"
     data-season={seasonAtDoy(selectedDoy)}
     data-act={SLIDES[slide]?.id}
+    /* Lets the CSS stop the deck doing any rendering work while the
+       opening covers it -- see .site-shell[data-intro='playing']. */
+    data-intro={briefDone ? 'done' : 'playing'}
     id="top"
   >
 
@@ -539,14 +552,37 @@ export default function App() {
       </div>
     )}
 
-    {/* Mounted UNDER the descent, not after it, so the deck never shows
-        through during the cross-fade. */}
-    {entered && !briefDone && (
-      <FarmerIntro farmId={farmId} beats={introBeats} reducedMotion={reducedMotion} onDone={finishBrief} active={introDone} />
+    {/* A dumb, stateless plate under the whole opening sequence.
+        The deck is always mounted, so any instant where neither the
+        descent nor the brief is painting shows Act one through the gap --
+        which is the split second of the wheel between the zoom and the
+        farmer. The old cure was to pre-mount the brief underneath the
+        descent, but that left a long-lived INACTIVE brief, and a stuck
+        flag then stranded the farmer on screen with no text box.
+        This is the cure without the cost: no state, no effects, no
+        props. It cannot freeze, and it covers every gap in the handoff
+        because it outlives both overlays. z-60 puts it under the brief
+        (68) and the descent (70) and over everything in the deck. */}
+    {entered && !briefDone && <div className="intro-backdrop" aria-hidden="true" />}
+
+    {/* Mounted only ONCE THE DESCENT IS DONE.
+        It used to mount underneath the descent so the deck could not
+        flash through the cross-fade. That is no longer needed -- the
+        descent now paints its own dark plate from the moment it mounts,
+        so it covers the gap itself.
+        Pre-mounting it cost more than it bought: it created a long-lived
+        INACTIVE instance whose walk-in, typing and speech were all gated
+        off, and a brief that is mounted but inactive is one stuck flag
+        away from a farmer standing on screen with no text box and no way
+        forward. With this gate the component only ever exists in its
+        working state, and `active` is no longer a thing that can be
+        wrong. */}
+    {entered && introDone && !briefDone && (
+      <FarmerIntro key={farmId} farmId={farmId} beats={introBeats} reducedMotion={reducedMotion} onDone={finishBrief} active />
     )}
 
     {entered && !introDone && (
-      <SatelliteIntro farmId={farmId} place={bundle.farm.place} areaHa={bundle.farm.area_ha} rotationLabel={bundle.observed_rotation?.inferred_label ?? 'Corn-Soybean'} bareDays={current.bare_days} reducedMotion={reducedMotion} onDone={finishSatellite} />
+      <SatelliteIntro key={farmId} farmId={farmId} place={bundle.farm.place} areaHa={bundle.farm.area_ha} rotationLabel={bundle.observed_rotation?.inferred_label ?? 'Corn-Soybean'} bareDays={current.bare_days} reducedMotion={reducedMotion} onDone={finishSatellite} />
     )}
 
     <SlideDeck slides={SLIDES} index={slide} onIndex={setSlide} reducedMotion={reducedMotion}>
@@ -625,6 +661,13 @@ export default function App() {
             <PhaseYearChart average={clim.soil_cover} phases={phaseCovers} labels={phaseLabels} doy={selectedDoy} />
             <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
           </div>
+          {/* "Not every year is the same" is this act's whole point, and
+              the phase chart only makes it about corn years versus bean
+              years. This makes it about 2000 versus 2024 as well -- the
+              question the challenge is named after. */}
+          <aside className="pane-side">
+            <ShiftReadout trends={bundle.trends ?? []} />
+          </aside>
         </div>
       </div>
 

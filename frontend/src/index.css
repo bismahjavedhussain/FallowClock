@@ -1731,3 +1731,135 @@ body { background: var(--deck-bg); }
    rather than by where they happened to land in the grid. */
 .seed-art { display: block; margin-bottom: 7px; line-height: 0; }
 .seed-art .seed-icon { display: block; }
+
+
+/* --- what has shifted (Act two) --------------------------------------- */
+/* Act two is "not every year is the same". The phase chart makes that
+   about corn years versus bean years; this makes it about 2000 versus
+   2024. Both halves of the same claim, so they share the act. */
+.pane-desk .pane-grid { grid-template-columns: minmax(0, 1.5fr) minmax(300px, .85fr); }
+
+.shift-readout { display: flex; flex-direction: column; min-height: 0; padding: 14px 15px 13px; border: 1px solid #c4d6c4; border-radius: 15px; background: #fbfcf5; box-shadow: 0 8px 22px #3c654718; overflow-y: auto; }
+.shift-head { flex: none; }
+.shift-head .eyebrow { color: #6c8a71; }
+.shift-head h3 { margin: 3px 0 5px; font: 700 17px/1.2 Georgia, serif; color: #2c4b3c; }
+.shift-head p { margin: 0 0 11px; color: #5f7366; font: 11.5px/1.45 system-ui; }
+.shift-head strong { color: #2f6b52; }
+
+.shift-list { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 7px; margin: 0; padding: 0; list-style: none; }
+.shift-list li { padding: 8px 10px; border: 1px solid #dde7d9; border-left-width: 3px; border-radius: 10px; background: #fff; }
+/* A measured change and a null must be told apart at a glance, and the
+   null must not look like a failure -- it is a result. */
+.shift-list li[data-moved='yes'] { border-left-color: #2f6b52; background: #f3f9f0; }
+.shift-list li[data-moved='no'] { border-left-color: #c3cdb6; }
+
+.shift-row { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.shift-row strong { color: #2f4a3a; font: 700 12.5px/1.25 system-ui; }
+.shift-verdict { flex: none; padding: 1px 7px; border-radius: 999px; font: 700 9px/1.6 system-ui; letter-spacing: .07em; text-transform: uppercase; }
+li[data-moved='yes'] .shift-verdict { background: #2f6b52; color: #f3faf1; }
+li[data-moved='no'] .shift-verdict { background: #e6ebe0; color: #6b7d6e; }
+
+.shift-change { margin: 4px 0 0; color: #35513f; font: 600 11.5px/1.4 system-ui; }
+li[data-moved='no'] .shift-change { color: #6b7d6e; font-weight: 500; }
+.shift-why { margin: 2px 0 0; color: #7b8a7c; font: 10.5px/1.4 system-ui; }
+.shift-p { color: #9aa79a; font-variant-numeric: tabular-nums; }
+
+.shift-note { flex: none; margin: 10px 0 0; padding-top: 9px; border-top: 1px dashed #c9d6c6; color: #6d7d6d; font: 10px/1.45 system-ui; }
+
+@media (max-width: 980px) {
+  .pane-desk .pane-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+.shift-consequence { flex: none; margin: 10px 0 0; padding: 9px 11px; border-radius: 10px; background: #eef6ea; border: 1px solid #c3dcc4; color: #2f4a3a; font: 11.5px/1.5 system-ui; }
+.shift-consequence strong { color: #2f6b52; }
+
+
+/* --- holding the frame between Begin and the descent ------------------ */
+/* .sat-intro already carries the full-screen dark plate; this is just the
+   quiet mark that sits on it while the chip loads, so a slow fetch reads
+   as loading rather than as a black screen. */
+.sat-waiting { display: grid; place-items: center; }
+.sat-waiting-mark { width: 26px; height: 26px; border: 2px solid #2a5546; border-top-color: #7fc9a8; border-radius: 50%; animation: sat-waiting-spin 1s linear infinite; }
+@keyframes sat-waiting-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .sat-waiting-mark { animation: none; border-top-color: #2a5546; }
+}
+
+
+/* --- the plate under the whole opening --------------------------------- */
+/* Spans entry gate -> descent -> brief, so no handoff between them can
+   reveal the deck sitting underneath. Deliberately featureless: the two
+   overlays above it carry the visuals. */
+.intro-backdrop { position: fixed; inset: 0; z-index: 60; background: #07140f; pointer-events: none; }
+
+
+/* --- the descent must not re-rasterise while it zooms ------------------ */
+/* .sat-frame scales a background-image from 1x to about 6x over twenty
+   seconds. transform IS composited, but a background bitmap on an
+   unpromoted layer gets RE-RASTERISED as the scale grows -- the browser
+   keeps redrawing it at higher resolution, and each redraw is a hitch on
+   the main thread. That is the stutter, not the animation.
+   will-change promotes it up front, so the image is rasterised once and
+   the GPU scales the texture. It costs sharpness at the far end of the
+   zoom, which is honest here: the chip is 1024px of 10 m Sentinel-2 and
+   the pipeline's own note says you cannot zoom from orbit to ground
+   truth on it. Smooth and soft beats sharp and stuttering.
+   The element unmounts with the intro, so the promoted layer is not a
+   lasting cost. */
+.sat-frame { will-change: transform; backface-visibility: hidden; }
+
+/* The idle drift and the zoom both drive transform. Letting the 6s
+   transition still be in flight when the animation takes over makes the
+   first moment of the zoom fight itself. */
+.sat-intro.phase-zoom .sat-frame { transition: none; }
+
+
+/* --- the deck does no work while the opening covers it ---------------- */
+/* The 3D ring runs a full WebGL loop -- trees, atmosphere, a scene render
+   every frame. It pauses itself on IntersectionObserver and
+   document.hidden (YearRing3D), but an opaque overlay satisfies NEITHER:
+   the canvas is still geometrically in the viewport and the tab is still
+   focused. So every frame of the twenty-second descent was competing
+   with a full 3D render, which is the stutter that survived promoting
+   the zoom layer.
+   content-visibility: hidden gives the subtree no layout boxes, so the
+   observer reports not-intersecting and the loop stops ITSELF through
+   machinery that already exists -- no new props, no pause plumbing.
+   Safe to reverse: the container has a ResizeObserver, so when the deck
+   comes back it re-measures and the canvas resizes correctly. */
+.site-shell[data-intro='playing'] .deck { content-visibility: hidden; }
+
+
+/* --- the zoom must survive the fade-out -------------------------------- */
+/* `.sat-intro.phase-zoom .sat-frame` stopped matching the instant the
+   class became phase-gone, so the animation was dropped and the frame
+   fell back to the base `transform: scale(1)`. The descent therefore
+   SNAPPED BACK to the wide orbital view and played the whole 0.7s
+   fade-out from there -- which is the zoomed-out flash before the
+   farmer.
+   Declaring the identical animation for phase-gone keeps it running:
+   the animation list is unchanged across the class swap, so it is not
+   restarted, it simply carries on. That also means a skip part-way
+   through fades from wherever the zoom had reached rather than jumping
+   to the end. */
+.sat-intro.phase-zoom .sat-frame,
+.sat-intro.phase-gone .sat-frame {
+  animation: sat-zoom 20s cubic-bezier(.4,.05,.3,1) both;
+  transition: none;
+}
+
+
+/* --- the shift panel must not squash its own list --------------------- */
+/* .shift-list had `flex: 1; min-height: 0`, which let the flex column
+   shrink it below the height of its five rows. With no overflow set on
+   the list, the rows then painted straight over the consequence box and
+   the footnote underneath -- overlapping text, not clipped text.
+   The panel already scrolls (overflow-y on .shift-readout), so nothing
+   inside it should be shrinkable: let every block take its natural
+   height and let the panel scroll past them. */
+.shift-readout .shift-list { flex: none; min-height: auto; }
+.shift-readout .shift-list > li { flex: none; }
+/* Belt and braces: a long metric name must wrap rather than widen the
+   row and push the verdict chip out of the panel. */
+.shift-row { flex-wrap: wrap; }
+.shift-row strong { min-width: 0; overflow-wrap: anywhere; }

@@ -15,7 +15,7 @@ Keep it updated when something here stops being true.
 | **Git identity** | Commit and push only as `bismahjavedhussain <bismahjavedhussain@gmail.com>`. **Never** use the Stanford address (`swaheed@stanford.edu`) anywhere — not in commits, files, or history. It has been scrubbed twice already. |
 | **Never push the plan docs** | The three files in `project MD files/` stay untracked and local. Stated twice. They are deliberately excluded from every commit. |
 | **Ask before pushing** | The user delegates git ("I don't know how to use github, you'll push for me"), but confirm before anything that reaches the remote or other people's branches. |
-| **No skip buttons in the intro** | The opening sequence is deliberately unavoidable. The user overrode the "never trap a judge" advice twice. Do not re-add a skip. |
+| **No skip BUTTON in the intro** | Rule revised 15 Nov. No visible skip control — but a click anywhere on the descent does move on, reinstated on request after being removed. Earlier the rule was "unavoidable, full stop"; it is not any more. |
 | **Sound is always on** | No "begin without sound" option. One Begin click only, because browsers require a user gesture before audio. |
 
 ---
@@ -35,6 +35,14 @@ peak arrives. Same conclusion, stronger evidence.
 **Second field, opposite answer.** Monona County is already conservation
 tillage and the tool says *do nothing*. That contrast is the strongest thing
 in the project — a tool that refuses to invent a recommendation.
+
+**The shift (added 15 Nov).** The challenge is called *Field Shift* and the
+tool was answering a static question. Theil-Sen + Mann-Kendall over 25 years
+of NASA POWER now says what is moving: **the first autumn frost is arriving
+~6.8 days later per decade (p=0.014), ~16 days across the record**, so a
+cover crop drilled after harvest has 16 more frost-free days to establish
+than in 2000. Spring frost, annual erosivity and the share of erosive rain
+landing in the bare window are all **flat** - shown as nulls, not hidden.
 
 ---
 
@@ -131,6 +139,11 @@ ESA and must always be labelled so.
 - `cropfit.py` — species fitting. **Mirrored in `frontend/src/lib/cropFit.ts`**;
   shared test vectors guard the drift. Change one, change both.
 - `weather.py` `erosivity.py` `soilwater.py` `rotations.py` `bundle.py`
+- `trends.py` - Theil-Sen slope + Mann-Kendall test on whole years.
+  **Never trend bare days**: ~70 clear scenes/yr means a per-year cover
+  curve is mostly interpolation. Per-year erosivity PEAK DOY was tried
+  and thrown out - an argmax on one year's storms, it read 40 d/decade
+  out of pure scatter. Use the bare-window SHARE instead: an integral.
 - `imagery.py` `cdl.py` `stac_client.py` — B1's satellite pipeline.
 - `scripts/build_bundle.py` — writes `frontend/public/bundles/farm_*.json`
 - `scripts/fetch_field_image.py` — Sentinel-2 chips for the intro.
@@ -145,6 +158,8 @@ Key files: `App.tsx` (the shell, heavily rewritten), `SlideDeck.tsx`,
 `YearRing.tsx` (U1's), `PhaseToggle.tsx` (from Kaif), `FieldNotes.tsx`.
 Libs: `acts.ts` `intro.ts` `guide.ts` `sound.ts` `speech.ts` `sources.ts`
 `cropFit.ts` `proposal.ts` `atmosphere.ts` `seasons.ts`.
+`ShiftReadout.tsx` (Act 2, the trends) `TelemetryMesh.tsx` `SeedIcon.tsx`
+`seedArt.ts` `seedCursor.ts` `telemetryMesh.ts`.
 
 ---
 
@@ -216,10 +231,9 @@ airplane mode.
 - The species table is unverified (`verified=false` on every row).
 - `earthengine-api` is still in `requirements.txt` but GEE was dropped.
 
-### ⚠ Remove before submission
+### Intro skip — rule changed 15 Nov
 
-`SatelliteIntro.tsx` has a **click-anywhere-to-skip** on the descent, added
-purely so the 22-second opening need not be sat through on every reload
-during development. It contradicts the standing "the intro is unavoidable"
-rule in §1. Delete the `skip` callback and the `onClick` on the root
-element — both are commented `TESTING`, and nothing else depends on them.
+The user **reversed** the "no skip" rule in §1. `SatelliteIntro` has a
+click-anywhere skip again, deliberately and permanently: no visible
+control, but one click moves past the descent. §1's "no skip buttons"
+line now means **no visible button**, not "no way out".

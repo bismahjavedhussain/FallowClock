@@ -1,5 +1,79 @@
 {
   "$defs": {
+    "ClimateTrend": {
+      "additionalProperties": false,
+      "description": "One metric fitted across whole years of the NASA POWER record.\n\nThe challenge is called Field Shift, and a 25-year climatology cannot\nanswer whether anything is shifting -- it is the average that hides\nit. These are the trends that record can honestly carry.\n\nNote what is NOT here: a trend in bare days. Cover comes from about\nseventy clear satellite looks a year, so a per-year cover curve would\nbe mostly interpolation and its trend would track cloud as much as\ncropping. The weather is one source, one point, every year equally\nobserved, so only the weather is trended.\n\n`significant` is the only field a headline may read. `slope_per_decade`\non a flat series is noise with a sign, and several of these ARE flat --\nwhich is itself a finding and is reported as one.",
+      "properties": {
+        "metric": {
+          "description": "e.g. first_fall_frost_doy",
+          "title": "Metric",
+          "type": "string"
+        },
+        "unit": {
+          "title": "Unit",
+          "type": "string"
+        },
+        "years": {
+          "description": "One per fitted year, ascending.",
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 2,
+          "title": "Years",
+          "type": "array"
+        },
+        "values": {
+          "description": "Same order as years.",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 2,
+          "title": "Values",
+          "type": "array"
+        },
+        "slope_per_decade": {
+          "description": "Theil-Sen slope, median of pairwise slopes, per decade. Robust to one odd year.",
+          "title": "Slope Per Decade",
+          "type": "number"
+        },
+        "p_value": {
+          "description": "Mann-Kendall two-sided, rank based, no distribution assumed.",
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "P Value",
+          "type": "number"
+        },
+        "significant": {
+          "description": "p < 0.05.",
+          "title": "Significant",
+          "type": "boolean"
+        },
+        "direction": {
+          "description": "'flat' whenever not significant, so a null cannot be read as a direction.",
+          "enum": [
+            "earlier",
+            "later",
+            "up",
+            "down",
+            "flat"
+          ],
+          "title": "Direction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "metric",
+        "unit",
+        "years",
+        "values",
+        "slope_per_decade",
+        "p_value",
+        "significant",
+        "direction"
+      ],
+      "title": "ClimateTrend",
+      "type": "object"
+    },
     "Climatology": {
       "additionalProperties": false,
       "description": "All arrays indexed by DOY-1, length 365.",
@@ -793,6 +867,14 @@
       },
       "minItems": 1,
       "title": "Uncertainty",
+      "type": "array"
+    },
+    "trends": {
+      "description": "How the weather this field must cope with has moved across the record.",
+      "items": {
+        "$ref": "#/$defs/ClimateTrend"
+      },
+      "title": "Trends",
       "type": "array"
     }
   },
