@@ -35,6 +35,11 @@ export default function FieldDiaryModal({
 
   useEffect(() => {
     if (!open) return
+    // Always open on the findings. This component returns null while closed
+    // rather than unmounting, so without this the tab choice persisted and
+    // reopening the diary landed back on a log that is empty until the user
+    // places a crop or runs a storm.
+    setPage('crux')
     playPageFlip()
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -77,7 +82,7 @@ export default function FieldDiaryModal({
               aria-selected={page === 'log'}
               onClick={() => { playPageFlip(); setPage('log') }}
             >
-              This session <span>{log.length}</span>
+              This session{log.length > 0 && <span>{log.length}</span>}
             </button>
           </div>
           <button type="button" className="diary-close" onClick={onClose} aria-label="Close diary">

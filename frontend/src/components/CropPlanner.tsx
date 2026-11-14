@@ -2,7 +2,7 @@ import type { FitResult, Species } from '../lib/cropFit'
 import { doyToDate } from './YearRing'
 import { playLift, playPick } from '../lib/sound'
 
-export default function CropPlanner({ species, fits, picked, placed, onPick, onPlace, onRemove, onReset, baselineBare, proposedBare, baselineExposure, proposedExposure }: {
+export default function CropPlanner({ species, fits, picked, placed, onPick, onPlace, onRemove, onReset, baselineBare, proposedBare, baselineExposure, proposedExposure, hasProposal = false, phaseNote = null }: {
   species: Species[]
   fits: FitResult[]
   picked: string | null
@@ -15,6 +15,10 @@ export default function CropPlanner({ species, fits, picked, placed, onPick, onP
   proposedBare: number
   baselineExposure: number
   proposedExposure: number
+  /** True once a crop is actually placed. */
+  hasProposal?: boolean
+  /** Which year(s) these figures describe, e.g. "in a corn year". */
+  phaseNote?: string | null
 }) {
   const fitById = new Map(fits.map((fit) => [fit.speciesId, fit]))
   return <section className="crop-planner" aria-label="Propose cover crops">
@@ -37,8 +41,21 @@ export default function CropPlanner({ species, fits, picked, placed, onPick, onP
       <button type="button" onClick={onPlace}>Place at suggested date</button>
     </div>}
     <div className="proposal-results">
-      <div><span>Bare days</span><strong>{baselineBare} <span aria-hidden="true">→</span> {proposedBare}</strong></div>
-      <div><span>Modelled erosion exposure</span><strong>{baselineExposure.toFixed(1)} <span aria-hidden="true">→</span> {proposedExposure.toFixed(1)}</strong></div>
+      <div>
+        <span>Bare days</span>
+        <strong>
+          {baselineBare}
+          {hasProposal && <> <span className="to" aria-label="becomes">→</span> <b>{proposedBare}</b></>}
+        </strong>
+      </div>
+      <div>
+        <span>Modelled erosion exposure</span>
+        <strong>
+          {baselineExposure.toFixed(1)}
+          {hasProposal && <> <span className="to" aria-label="becomes">→</span> <b>{proposedExposure.toFixed(1)}</b></>}
+        </strong>
+      </div>
+      {phaseNote && <p className="proposal-basis">{hasProposal ? 'Now and proposed, ' : 'As the field stands, '}{phaseNote}.</p>}
     </div>
         {placed.length > 0 && <div className="placed-list"><strong>Added proposals</strong>{placed.map((id) => <button key={id} type="button" onClick={() => { playLift(); onRemove(id) }} aria-label={`Remove ${fitById.get(id)?.speciesName ?? id}`}>{fitById.get(id)?.speciesName ?? id} <span>Remove ×</span></button>)}<button type="button" onClick={() => { playLift(); onReset() }}>Reset comparison</button></div>}
   </section>

@@ -70,6 +70,26 @@ export interface YearRingProps {
   highlightDoys?: number[]
   size?: number
   yearLabel?: string | number
+  /**
+   * The authoritative bare-day count, when the caller has one.
+   *
+   * JENSEN AGAIN. Left to itself this component counts days under the
+   * threshold on whatever curve it was handed, and the curve it is handed
+   * with no phase selected is the MEAN of the corn year and the soybean
+   * year -- a year no field actually had. Thresholding that mean gave 110
+   * for Story County while the card beside the wheel read 104, and on
+   * Monona it gives 0 for a field with 7 real bare days. The bundle's
+   * figure is measured per phase and then averaged, which is the right way
+   * round, so when the caller has it, it wins.
+   */
+  bareDaysOverride?: number | null
+  /**
+   * The authoritative longest bare gap, likewise. Recomputed from the mean
+   * curve this reads Mar 29 - Jun 8 (72d) for Story County; the bundle,
+   * which takes the union of the gap across both phases, says Mar 24 -
+   * Jun 14 (83d), and that is the number the rest of the app quotes.
+   */
+  gapOverride?: { startDoy: number; endDoy: number; nDays: number; wraps: boolean } | null
   selectedDoy?: number | null
   initialMode?: '2D' | '3D'
   onHoverDay?: (doy: number | null) => void
@@ -77,6 +97,8 @@ export interface YearRingProps {
   onActivateDay?: (doy: number) => void
   onModeChange?: (mode: '2D' | '3D') => void
   reducedMotion?: boolean
+  /** Shared corner for the dial's pills; see YearRing3DProps.cornerSlot. */
+  cornerSlot?: HTMLElement | null
   synthetic?: boolean
   showLegend?: boolean
 }
@@ -235,6 +257,8 @@ export default function YearRing({
   highlightDoys,
   size = 620,
   yearLabel = 'Annual Cycle',
+  bareDaysOverride = null,
+  gapOverride = null,
   selectedDoy: propSelectedDoy,
   initialMode = '2D',
   onHoverDay,
@@ -242,6 +266,7 @@ export default function YearRing({
   onActivateDay,
   onModeChange,
   reducedMotion = false,
+  cornerSlot = null,
   synthetic = false,
   showLegend = true,
 }: YearRingProps) {
@@ -314,10 +339,11 @@ export default function YearRing({
     [highlightSet],
   )
 
-  const bareDaysCount = useMemo(
+  const ownBareDays = useMemo(
     () => soilCover.filter((v, i) => (nObs[i] ?? 1) > 0 && v < BARE_THRESHOLD).length,
     [soilCover, nObs],
   )
+  const bareDaysCount = bareDaysOverride ?? ownBareDays
 
   const unknownDaysCount = useMemo(
     () => nObs.filter((n) => n <= 0).length,
@@ -330,9 +356,10 @@ export default function YearRing({
   )
 
   const longestGap = useMemo(() => {
+    if (gapOverride) return gapOverride
     if (bareRuns.length === 0) return null
     return [...bareRuns].sort((a, b) => b.nDays - a.nDays)[0]
-  }, [bareRuns])
+  }, [bareRuns, gapOverride])
 
   const lastSpringFrost = useMemo(() => {
     for (let i = 180; i >= 0; i--) if (frostProb[i] >= KILLING_FROST_PROB) return i + 1
@@ -742,11 +769,11 @@ export default function YearRing({
 
             {/* Centre Readout */}
             <g textAnchor="middle" pointerEvents="none">
-              <circle cx={cx} cy={cy} r={rCoverInner - size * 0.008} fill="#f8fff0" fillOpacity={0.78} stroke="#dcebd7" strokeOpacity={0.8} />
+              <circle cx={cx} cy={cy} r={rCoverInner - size * 0.004} fill="#fbfff6" stroke="#cfe3c8" strokeWidth={1.5} />
               <text
                 x={cx}
-                y={cy - size * 0.055}
-                fontSize={size * 0.02}
+                y={cy - size * 0.06}
+                fontSize={size * 0.019}
                 fontWeight={600}
                 className="fill-ink-soft uppercase tracking-wider"
               >
@@ -754,8 +781,8 @@ export default function YearRing({
               </text>
               <text
                 x={cx}
-                y={cy + size * 0.015}
-                fontSize={size * 0.11}
+                y={cy + size * 0.012}
+                fontSize={size * 0.105}
                 fontWeight={700}
                 className="fill-ink"
               >
@@ -763,8 +790,8 @@ export default function YearRing({
               </text>
               <text
                 x={cx}
-                y={cy + size * 0.065}
-                fontSize={size * 0.026}
+                y={cy + size * 0.058}
+                fontSize={size * 0.024}
                 fontWeight={500}
                 className="fill-ink-soft"
               >
@@ -773,8 +800,8 @@ export default function YearRing({
               {longestGap && (
                 <text
                   x={cx}
-                  y={cy + size * 0.1}
-                  fontSize={size * 0.019}
+                  y={cy + size * 0.094}
+                  fontSize={size * 0.0175}
                   className="fill-soil-bare font-medium"
                 >
                   {longestGap.wraps ? '🔄 ' : ''}
@@ -811,6 +838,7 @@ export default function YearRing({
               onSelectDay={handleSelect}
               onActivateDay={onActivateDay}
               reducedMotion={reducedMotion}
+              cornerSlot={cornerSlot}
               onWebGLUnavailable={() => {
                 setWebglError('WebGL is unavailable in this browser session. Using 2D.')
                 setMode('2D')

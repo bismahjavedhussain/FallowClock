@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 import * as THREE from 'three'
 import { createProceduralTree } from './seasonal/ProceduralTree'
@@ -20,6 +21,19 @@ export interface YearRing3DProps {
   onActivateDay?: (doy: number) => void
   onWebGLUnavailable?: () => void
   reducedMotion?: boolean
+  /**
+   * Where to render the Reset camera pill, if not in this component's own
+   * corner.
+   *
+   * It belongs beside the legend trigger, but that button is a child of
+   * `.hero-world` while this canvas is three levels further in, so the two
+   * had different containing blocks: `bottom: 12px` on each meant two
+   * different places, and the gap between them changed with the layout.
+   * Given a slot they become siblings in one flex column and the spacing
+   * is a single `gap`. Without one this renders in its own corner, so the
+   * component still stands alone.
+   */
+  cornerSlot?: HTMLElement | null
 }
 
 export const MONTH_START_DOYS = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
@@ -92,7 +106,7 @@ function monthLabels(scene: THREE.Scene) {
   }
 }
 
-export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, highlightDoys, selectedDoy, hoveredDoy, onHoverDay, onSelectDay, onActivateDay, onWebGLUnavailable, reducedMotion = false }: YearRing3DProps) {
+export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, highlightDoys, selectedDoy, hoveredDoy, onHoverDay, onSelectDay, onActivateDay, onWebGLUnavailable, reducedMotion = false, cornerSlot = null }: YearRing3DProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
@@ -358,16 +372,23 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
   }, [])
 
+  const resetButton = (
+    <button
+      type="button"
+      className="dial-pill ring-reset"
+      onPointerDown={(event) => event.stopPropagation()}
+      onClick={() => { anglesRef.current = { theta: 0.38, phi: 0.92, radius: 29 } }}
+    >
+      <span aria-hidden="true">⟳</span>
+      Reset camera
+    </button>
+  )
+
   if (!webglSupported) return <div className="flex h-full flex-col items-center justify-center p-8 text-center text-ink-soft"><p className="font-semibold text-risk-high">3D graphics are unavailable in this browser.</p><p className="mt-1 text-sm">Use the 2D Year Ring to continue.</p></div>
   return <div ref={containerRef} className="relative h-full w-full overflow-hidden rounded-xl border border-black/10 bg-paper" style={{ touchAction: 'none' }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onLostPointerCapture={() => { dragRef.current.active = false }} onPointerLeave={() => { if (!dragRef.current.active && lastHoverRef.current !== null) { lastHoverRef.current = null; onHoverDay?.(null) } }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const doy = pickDay(event.clientX, event.clientY); if (doy) { onSelectDay?.(doy); onActivateDay?.(doy) } }} role="region" aria-label="3D Year Ring Interactive Calendar">
     <canvas ref={canvasRef} className="block h-full w-full cursor-grab active:cursor-grabbing" />
     {/* Bottom-left: top-left is the day tooltip, top-centre the phase pills, bottom-right Reset camera. */}
     <div className="pointer-events-none absolute bottom-3 left-3 max-w-[48%] rounded-md bg-white/85 px-2 py-1 text-[11px] font-medium text-ink-soft backdrop-blur">Drag to orbit · scroll to zoom · click a day</div>
-    {/* Shares .dial-pill with the legend trigger so the two corner
-        controls cannot drift apart visually. */}
-    <button type="button" className="dial-pill ring-reset" onPointerDown={(event) => event.stopPropagation()} onClick={() => { anglesRef.current = { theta: 0.38, phi: 0.92, radius: 29 } }}>
-      <span aria-hidden="true">⟳</span>
-      Reset camera
-    </button>
+    {cornerSlot ? createPortal(resetButton, cornerSlot) : resetButton}
   </div>
 }

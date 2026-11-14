@@ -1183,7 +1183,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
    keeps it clear of the dial, Reset camera and the footer alike. */
 /* Capped and scrollable. Bottom-anchored with auto height, a tall legend
    simply ran off the top of the viewport and lost its own heading. */
-.legend-flyout { position: fixed; right: 20px; bottom: calc(var(--bottom-bar) + 16px); z-index: 60; width: min(340px, calc(100vw - 40px)); max-height: calc(100dvh - var(--bottom-bar) - 96px); overflow-y: auto; overscroll-behavior: contain; padding: 6px; border-radius: 16px; background: #fffdf8; box-shadow: 0 18px 44px #1f3a2a4d; animation: legend-in .24s cubic-bezier(.2,.9,.3,1) both; }
+.legend-flyout { position: fixed; right: 20px; bottom: calc(var(--bottom-bar) + 16px); z-index: 60; width: min(340px, calc(100vw - 40px)); max-height: calc(100dvh - var(--bottom-bar) - 130px); overflow-y: auto; overscroll-behavior: contain; padding: 6px; border-radius: 16px; background: #fffdf8; box-shadow: 0 18px 44px #1f3a2a4d; animation: legend-in .24s cubic-bezier(.2,.9,.3,1) both; }
 @keyframes legend-in { from { opacity: 0; transform: translateX(14px) } to { opacity: 1; transform: none } }
 .legend-flyout:focus { outline: none; }
 .legend-close { position: sticky; float: right; top: 4px; right: 4px; margin-left: 6px; z-index: 2; width: 26px; height: 26px; border: 1px solid #d4dbcb; border-radius: 50%; background: #fff; color: #5d6b5c; font-size: 15px; line-height: 1; cursor: pointer; }
@@ -1271,10 +1271,48 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 /* The badge: yellow disc, dark glyph, same on both. */
 .dial-pill span { flex: none; display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: #f0cf87; color: #26331f; font: 700 12px/1 system-ui; }
 
-/* Stacked with a clear gap, not touching: 34px tall + 14px of air. */
-.ring-reset { bottom: 12px; }
-.legend-ask { bottom: 60px; }
+/* Both pills live in .dial-corner now, so the space between them is one
+   `gap` rather than two `bottom` offsets measured from different boxes --
+   which is what left a ~55px hole between them. Reset camera sits ON TOP:
+   it acts on the wheel you are looking at, while the legend is a reference
+   you open once and close, so the frequent control is the nearer one.
+   The portal appends the reset pill after the legend trigger, so `order`
+   states the stacking rather than relying on DOM insertion. */
+.dial-corner { position: absolute; right: 12px; bottom: 12px; z-index: 7; display: flex; flex-direction: column; align-items: flex-end; gap: 9px; }
+/* Inside the stack the pills are flow items; on their own (YearRing3D used
+   standalone, as the tests do) they keep the absolute corner placement the
+   base .dial-pill rule gives them. */
+.dial-corner > .dial-pill { position: static; right: auto; bottom: auto; }
+.dial-pill { bottom: 12px; }
+.ring-reset { order: 1; }
+.legend-ask { order: 2; }
 
 @media (max-width: 900px), (max-height: 620px) {
-  .legend-ask { position: static; width: 100%; justify-content: flex-start; margin-top: 8px; }
+  .dial-corner { position: static; align-items: stretch; margin-top: 10px; }
+  .dial-pill { width: 100%; justify-content: flex-start; }
 }
+
+
+/* --- the seeding panel readout --------------------------------------- */
+/* Before a crop is placed there is one figure, not "110 -> 110". Once
+   there is a proposal the second figure is the one that matters, so it
+   carries the colour and the baseline recedes. */
+.proposal-results strong .to { margin: 0 2px; color: #8aa392; font-weight: 500; }
+.proposal-results strong b { color: #2f6b4a; font-weight: inherit; }
+.proposal-basis { margin: 6px 0 0; grid-column: 1 / -1; color: #6b7d6e; font: 11.5px/1.45 system-ui; }
+
+
+/* --- the 2D wheel must fit the pane it is in ------------------------- */
+/* The SVG is `w-full h-auto`, so its height follows its width. In a pane
+   that is wider than it is tall -- which is every desktop layout here --
+   that makes the wheel taller than the space it has, and `.hero-world`
+   has `overflow: hidden`, so the bottom months were simply cut off the
+   screen. Clipped months cannot be hovered or clicked, which is why part
+   of the year was unreachable with the mouse.
+   The viewBox is square, so constraining BOTH axes and letting the aspect
+   ratio hold makes the wheel fit whichever dimension is tighter. */
+.hero-world .year-ring-stage-2d { display: flex; align-items: center; justify-content: center; min-height: 0; }
+.hero-world .year-ring-stage-2d > svg { width: auto; height: auto; max-width: 100%; max-height: 100%; aspect-ratio: 1 / 1; }
+
+/* Same for the 3D stage, which otherwise inherits the same squeeze. */
+.hero-world .year-ring-stage-3d { min-height: 0; }

@@ -123,6 +123,9 @@ export default function App() {
   const [diary, setDiary] = useState<DiaryEntry[]>([])
   const [diaryOpen, setDiaryOpen] = useState(false)
   const [legendOpen, setLegendOpen] = useState(false)
+  // The dial's bottom-right corner. Both pills render into this one box so
+  // the space between them is a flex `gap` and not two guesses.
+  const [dialCorner, setDialCorner] = useState<HTMLDivElement | null>(null)
   const [writing, setWriting] = useState(false)
   const writeTimer = useRef(0)
   const stormTimers = useRef<number[]>([])
@@ -182,7 +185,17 @@ export default function App() {
     setBriefDone(false)
     setSlide(0)
     setActivePhase(null)
-  }, [farmId])
+    // The session belongs to the field it happened on. Without this, a
+    // rye placement made on Story County survived the switch to Monona --
+    // so the diary read "Sowed Cereal rye, -27% erosion exposure" while
+    // the panel beside it said nothing is worth seeding here, and the
+    // proposal arrows showed Story's crop scored against Monona's year.
+    // Switching fields has to rewrite everything, the session included.
+    setDiary([])
+    setWriting(false)
+    resetPlacedFills()
+    selectRotation(null)
+  }, [farmId, resetPlacedFills, selectRotation])
 
   const clim = bundle?.climatology
   const current = bundle?.rotations.find((r) => r.is_current)
@@ -368,9 +381,27 @@ export default function App() {
     })
   }
 
+  // A phase is a real year; the average is a curve no year followed. When
+  // a phase is picked, everything downstream draws THAT year -- otherwise
+  // the toggle would relabel the same mean curve and mean nothing.
+  const phaseIndex = activePhase && phaseLabels ? phaseLabels.indexOf(activePhase) : -1
+  const phaseBase = phaseIndex >= 0 && phaseCovers ? phaseCovers[phaseIndex] : null
+
   const baselineCover = selected?.soil_cover ?? current.soil_cover
   const accepted = placedFills.map((id) => fitById.get(id)).filter((fit) => fit?.feasible && fit.coverCurve.length === 365)
-  const { cover: ringCover, baselineBare, proposedBare, baselineExposure, proposedExposure } = proposalPreview(baselineCover, accepted as NonNullable<typeof accepted[number]>[], clim.erosivity_r, clim.n_obs_per_doy)
+
+  // The figures in the seeding panel are averaged over the real rotation
+  // phases, never read off the mean curve -- see the Jensen note on
+  // proposalPreview. Without this the panel printed 110 bare days three
+  // lines under a card reading 104, and on Monona it printed 0 for a field
+  // with 7 real bare days. The phase covers belong to the OBSERVED
+  // rotation, so the panel always measures from the real field; a
+  // hypothetical rotation picked in Act four has its own figures beside it
+  // there and must not silently become the baseline here.
+  const metricPhases = phaseCovers && phaseCovers.length
+    ? (phaseIndex >= 0 ? [phaseCovers[phaseIndex]] : phaseCovers)
+    : null
+  const { cover: ringCover, baselineBare, proposedBare, baselineExposure, proposedExposure } = proposalPreview(baselineCover, accepted as NonNullable<typeof accepted[number]>[], clim.erosivity_r, clim.n_obs_per_doy, metricPhases)
 
   const placeCrop = (day: number, speciesId = draggingSpeciesId) => {
     if (!speciesId) return
@@ -403,11 +434,6 @@ export default function App() {
   // pulse on the wheel, so placing a crop is felt and not only tabulated.
   const lush = baselineBare > 0 ? Math.max(0, Math.min(1, (baselineBare - proposedBare) / baselineBare)) : 0
 
-  // A phase is a real year; the average is a curve no year followed. When
-  // a phase is picked, everything downstream draws THAT year -- otherwise
-  // the toggle would relabel the same mean curve and mean nothing.
-  const phaseIndex = activePhase && phaseLabels ? phaseLabels.indexOf(activePhase) : -1
-  const phaseBase = phaseIndex >= 0 && phaseCovers ? phaseCovers[phaseIndex] : null
   const acceptedCurves = (accepted as NonNullable<typeof accepted[number]>[]).map((f) => f.coverCurve)
   const shownCover = phaseBase
     ? (acceptedCurves.length ? spliceRotationCover(phaseBase, acceptedCurves) : phaseBase)
@@ -416,6 +442,20 @@ export default function App() {
     phaseIndex >= 0 && current.bare_days_by_phase
       ? current.bare_days_by_phase[phaseIndex]
       : current.bare_days
+
+  // The wheel draws the mean curve when no phase is picked, and a gap found
+  // on that mean is shorter than the real one -- 72 days against the 83 the
+  // bundle reports, because the union of the two phases' gaps is wider than
+  // the gap in their average. Hand it the bundle's own gap instead. With a
+  // phase picked the wheel is drawing a real year, so let it find its own.
+  const wheelGap = phaseIndex >= 0 || !bundle.gaps[0]
+    ? null
+    : {
+        startDoy: bundle.gaps[0].start_doy,
+        endDoy: bundle.gaps[0].end_doy,
+        nDays: bundle.gaps[0].n_days,
+        wraps: bundle.gaps[0].wraps_year,
+      }
 
   const livingCover = accepted.length
     ? spliceRotationCover(clim.green_cover, (accepted as NonNullable<typeof accepted[number]>[]).map((f) => f.coverCurve))
@@ -519,12 +559,14 @@ export default function App() {
                   onChange={(k) => { playSwitch(); setActivePhase(k) }}
                 />
               )}
-              <LegendFlyout
-                open={legendOpen}
-                onOpen={() => { playSwitch(); setLegendOpen(true) }}
-                onClose={() => setLegendOpen(false)}
-              />
-              <YearRing initialMode="3D" showLegend={false} soilCover={shownCover} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} frostProb={clim.frost_prob} greenCover={clim.green_cover} residueCover={clim.residue_cover} compareCover={selected ? current.soil_cover : accepted.length ? baselineCover : undefined} highlightDoys={plantingDoys} selectedDoy={selectedDoy} onHoverDay={setHoveredDoy} onSelectDay={scrubTo} onActivateDay={(day) => draggingSpeciesId && placeCrop(day)} onModeChange={(m) => { playSwitch(); setMode(m) }} reducedMotion={reducedMotion} synthetic={bundle.provenance.is_synthetic} />
+              <div className="dial-corner" ref={setDialCorner}>
+                <LegendFlyout
+                  open={legendOpen}
+                  onOpen={() => { playSwitch(); setLegendOpen(true) }}
+                  onClose={() => setLegendOpen(false)}
+                />
+              </div>
+              <YearRing initialMode="3D" cornerSlot={dialCorner} showLegend={false} bareDaysOverride={shownBareDays} gapOverride={wheelGap} soilCover={shownCover} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} frostProb={clim.frost_prob} greenCover={clim.green_cover} residueCover={clim.residue_cover} compareCover={selected ? current.soil_cover : accepted.length ? baselineCover : undefined} highlightDoys={plantingDoys} selectedDoy={selectedDoy} onHoverDay={setHoveredDoy} onSelectDay={scrubTo} onActivateDay={(day) => draggingSpeciesId && placeCrop(day)} onModeChange={(m) => { playSwitch(); setMode(m) }} reducedMotion={reducedMotion} synthetic={bundle.provenance.is_synthetic} />
             </div>
             <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
             {lush > 0.02 && (
@@ -545,7 +587,7 @@ export default function App() {
               <div><span className="eyebrow">{bundle.provenance.is_synthetic ? 'From this sample' : 'From this field'}</span><strong>{shownBareDays} <small>days</small></strong><p>{activePhase ? `bare in a ${activePhase} year` : (phaseSplit ?? 'of bare soil expected per year')}</p></div>
               <div><span className="eyebrow">Erosivity overlap</span><strong>{Math.round((bundle.gaps[0]?.share_of_annual_r ?? 0) * 100)}<small>%</small></strong><p>of annual erosivity overlaps the largest bare gap</p></div>
             </div>
-            <CropPlanner species={bundle.species} fits={ranked} picked={draggingSpeciesId} placed={placedFills} onPick={setDraggingSpecies} onPlace={() => pickedFit && placeCrop(pickedFit.seedDoy)} onRemove={removePlacedFill} onReset={resetPlacedFills} baselineBare={baselineBare} proposedBare={proposedBare} baselineExposure={baselineExposure} proposedExposure={proposedExposure} />
+            <CropPlanner species={bundle.species} fits={ranked} picked={draggingSpeciesId} placed={placedFills} onPick={setDraggingSpecies} onPlace={() => pickedFit && placeCrop(pickedFit.seedDoy)} onRemove={removePlacedFill} onReset={resetPlacedFills} baselineBare={baselineBare} proposedBare={proposedBare} baselineExposure={baselineExposure} proposedExposure={proposedExposure} hasProposal={accepted.length > 0} phaseNote={phaseIndex >= 0 && phaseLabels ? `in a ${phaseLabels[phaseIndex]} year` : (metricPhases ? 'averaged over both rotation years' : null)} />
             {placementMessage && <p className="placement-message" role="status">{placementMessage}</p>}
           </aside>
         </div>
