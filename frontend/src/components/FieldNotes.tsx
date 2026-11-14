@@ -13,6 +13,7 @@
 
 import { useEffect, useRef } from 'react'
 import RingLegend from './RingLegend'
+import { sourceLines } from '../lib/sources'
 
 export interface FieldNotesData {
   place: string
@@ -26,6 +27,8 @@ export interface FieldNotesData {
   phaseLabels: string[] | null
   bareDays: number
   bareDaysByPhase: number[] | null
+  /** The one-sentence finding. Off the main screen, but not lost. */
+  finding?: string | null
   /** What the farmer has logged this session. */
   diary?: { id: string; stamp: string; text: string }[]
 }
@@ -86,13 +89,18 @@ export default function FieldNotes({
         </header>
 
         <div className="notes-drawer-body">
+          {data.finding && (
+            <section>
+              <h3>What this field shows</h3>
+              <p className="notes-finding">{data.finding}</p>
+            </section>
+          )}
+
           <section>
             <h3>How to read the wheel</h3>
             <RingLegend compact showDetails />
             <p className="notes-rule">
-              The bundle&apos;s <code>soil_cover</code> decides bare or covered. Green canopy and crop residue
-              are supporting evidence, not the decision. Days with no usable satellite pass stay unknown
-              rather than defaulting to bare. Rainfall erosivity is a separate outer layer.
+              <code>soil_cover</code> decides bare or covered. No observation stays unknown, never bare.
             </p>
           </section>
 
@@ -103,11 +111,7 @@ export default function FieldNotes({
               {phases ? ` — ${phases}.` : '.'}
             </p>
             {phases && (
-              <p className="notes-rule">
-                A corn-soybean field is a different field in alternate years, because the two crops leave very
-                different residue behind. The wheel shows the mean of the phases, so a day can read covered on
-                the wheel and still be bare in one phase of the rotation.
-              </p>
+              <p className="notes-rule">The wheel&apos;s average is a curve no real year followed.</p>
             )}
           </section>
 
@@ -130,11 +134,8 @@ export default function FieldNotes({
           <section>
             <h3>How crop fit is scored</h3>
             <p className="notes-rule">
-              Percentages are the reduction in erosion exposure inside the largest gap. Species are ranked by{' '}
-              <strong>evidence first</strong>: one we measured on neighbouring fields outranks a modelled one
-              even when the model promises more. Every modelled curve uses the same generic plateau, so
-              modelled species tie at identical percentages and read higher than they should. The measured
-              curve is lower because it is real. Treat modelled figures as an upper bound.
+              Ranked by <strong>evidence first</strong>. Modelled curves share one generic plateau, so treat
+              them as an upper bound.
             </p>
           </section>
 
@@ -153,13 +154,17 @@ export default function FieldNotes({
           )}
 
           <section>
-            <h3>Where the data comes from</h3>
-            <ul className="notes-sources">
-              {data.sources.map((s, i) => (
-                <li key={i}>{s.name}</li>
+            <h3>Data sources</h3>
+            <ul className="source-lines">
+              {sourceLines(data.sources).map((s, i) => (
+                <li key={i} data-nasa={s.nasa ? 'yes' : 'no'}>
+                  <strong>{s.name}</strong>
+                  <span>{s.gives}</span>
+                  {s.count && <em>{s.count}</em>}
+                </li>
               ))}
             </ul>
-            <small>Years used: {data.years.join(', ') || 'unspecified'}</small>
+            <small>{data.years.length ? `${data.years[0]}\u2013${data.years[data.years.length - 1]}` : 'years unspecified'} \u00b7 full method in the README</small>
             {data.synthetic && (
               <p className="notes-rule notes-warn">
                 This bundle is a synthetic sample. The cover curves were not observed by any satellite.

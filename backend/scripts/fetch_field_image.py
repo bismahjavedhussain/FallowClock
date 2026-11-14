@@ -42,8 +42,14 @@ SIZE = 1024
 WINDOW = ("2024-06-01", "2024-08-31")
 MAX_CLOUD = 8.0
 
+#: A scene must fill essentially the whole frame. Anything less and the
+#: zoom flies into a black no-data wedge.
+MIN_COVERAGE = 0.995
+#: How many candidates to pull before giving up. Each costs one block read.
+MAX_TRIES = 8
 
-def stretch_rgb(bands: np.ndarray, lo_pct=2.0, hi_pct=98.0, gamma=1.15) -> np.ndarray:
+
+def stretch_rgb(bands, lo_pct=2.0, hi_pct=98.0, gamma=1.15, valid=None) -> np.ndarray:
     """True-colour stretch to 8-bit, with ONE scale shared by all three bands.
 
     Stretching each band to its own percentiles independently is the obvious
@@ -55,7 +61,8 @@ def stretch_rgb(bands: np.ndarray, lo_pct=2.0, hi_pct=98.0, gamma=1.15) -> np.nd
     A shared scale keeps the ratios, so vegetation reads green and bare soil
     reads brown -- which is the whole point of showing a farmer their field.
     """
-    finite = bands[np.isfinite(bands)]
+    sample = bands if valid is None else bands[:, valid]
+    finite = sample[np.isfinite(sample)]
     if finite.size == 0:
         return np.zeros((*bands.shape[1:], 3), dtype=np.uint8)
     lo, hi = np.percentile(finite, [lo_pct, hi_pct])
@@ -85,15 +92,44 @@ def main() -> int:
         if not items:
             print("  no clear scene found; skipping")
             continue
+        # Cloud cover alone is NOT enough to pick a scene. A Sentinel-2 item
+        # intersects the bbox if it touches it at all, so the least cloudy
+        # candidate can be one whose swath covers half the frame and leaves
+        # the rest as no-data. That is exactly what happened to Monona: the
+        # chosen scene was 0.005% cloud and 52% black.
+        #
+        # read_block returns a mask as its last band for this reason, so
+        # walk the candidates in cloud order and take the first that
+        # actually covers the ground.
         items.sort(key=lambda it: it["properties"].get("eo:cloud_cover", 100))
-        item = items[0]
-        cloud = item["properties"].get("eo:cloud_cover")
-        day = item["properties"]["datetime"][:10]
-        print(f"  {len(items)} candidates; using {item['id']} ({day}, {cloud}% cloud)")
+        item = None
+        block = None
+        for cand in items[:MAX_TRIES]:
+            cand_day = cand["properties"]["datetime"][:10]
+            cand_cloud = cand["properties"].get("eo:cloud_cover")
+            trial = read_block(
+                "sentinel-2-l2a", cand["id"], bbox, SIZE, SIZE, ("B04", "B03", "B02")
+            )
+            covered = float((trial[-1] > 0).mean())
+            if covered >= MIN_COVERAGE:
+                item, block = cand, trial
+                print(f"  {len(items)} candidates; using {cand['id']} "
+                      f"({cand_day}, {cand_cloud}% cloud, {covered * 100:.1f}% covered)")
+                break
+            print(f"  skip {cand['id']} ({cand_day}, {cand_cloud}% cloud): "
+                  f"only {covered * 100:.1f}% of the frame has data")
+        if item is None or block is None:
+            print(f"  no candidate covers the frame; skipping {fid}")
+            continue
 
-        block = read_block("sentinel-2-l2a", item["id"], bbox, SIZE, SIZE, ("B04", "B03", "B02"))
         off = s2_offset(item["properties"])
-        rgb = stretch_rgb(np.stack([block[i].astype(np.float32) + off for i in range(3)]))
+        day = item["properties"]["datetime"][:10]
+        cloud = item["properties"].get("eo:cloud_cover")
+        # Stretch on real pixels only -- no-data zeros would drag the low
+        # percentile to the floor and wash the whole image out.
+        valid = block[-1] > 0
+        bands = np.stack([block[i].astype(np.float32) + off for i in range(3)])
+        rgb = stretch_rgb(bands, valid=valid)
 
         img = Image.fromarray(rgb)
         path = OUT / f"field-{fid}.webp"

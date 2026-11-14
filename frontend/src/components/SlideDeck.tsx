@@ -24,34 +24,15 @@ export interface Slide {
   eyebrow: string
 }
 
-/** Wheel events arrive in bursts; one page per gesture, not per tick. */
-const WHEEL_COOLDOWN_MS = 620
-const SWIPE_THRESHOLD_PX = 56
-
 /**
- * Walk up from the wheel's target looking for something that can still
- * scroll in the direction the user is pushing.
+ * NOTHING SCROLLS BETWEEN ACTS.
  *
- * Without this, scrolling the seed-packet rail pages the whole deck to the
- * next act — the rail swallows nothing, the event bubbles, and the user
- * loses their place while trying to read a list.
+ * The deck used to page on a wheel gesture, deferring to any scrollable
+ * child until that child hit its limit. Reading the seed-packet rail to
+ * the bottom then threw you into the next act, which is the opposite of
+ * what scrolling a list should do. Acts change only on a deliberate
+ * control: the Next button, the arrows, the dots, or the keyboard.
  */
-function consumesWheel(target: EventTarget | null, deltaY: number, stop: HTMLElement | null): boolean {
-  let el = target instanceof HTMLElement ? target : null
-  while (el && el !== stop) {
-    const overflow = getComputedStyle(el).overflowY
-    if (overflow === 'auto' || overflow === 'scroll') {
-      const slack = el.scrollHeight - el.clientHeight
-      if (slack > 1) {
-        const atTop = el.scrollTop <= 0
-        const atBottom = el.scrollTop >= slack - 1
-        if ((deltaY > 0 && !atBottom) || (deltaY < 0 && !atTop)) return true
-      }
-    }
-    el = el.parentElement
-  }
-  return false
-}
 
 export default function SlideDeck({
   slides,
@@ -66,8 +47,6 @@ export default function SlideDeck({
   reducedMotion?: boolean
   children: React.ReactNode[]
 }) {
-  const lastWheel = useRef(0)
-  const touchX = useRef<number | null>(null)
   const deck = useRef<HTMLDivElement>(null)
 
   const go = useCallback(
@@ -116,24 +95,6 @@ export default function SlideDeck({
         className="deck-track"
         style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}
         data-reduced={reducedMotion ? 'on' : 'off'}
-        onWheel={(e) => {
-          // Horizontal intent, or a decisive vertical flick, pages the deck.
-          const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY
-          if (Math.abs(delta) < 14) return
-          // A list the user is still scrolling keeps the gesture.
-          if (consumesWheel(e.target, e.deltaY, deck.current)) return
-          const now = Date.now()
-          if (now - lastWheel.current < WHEEL_COOLDOWN_MS) return
-          lastWheel.current = now
-          go(index + (delta > 0 ? 1 : -1))
-        }}
-        onTouchStart={(e) => { touchX.current = e.touches[0]?.clientX ?? null }}
-        onTouchEnd={(e) => {
-          if (touchX.current == null) return
-          const dx = (e.changedTouches[0]?.clientX ?? touchX.current) - touchX.current
-          touchX.current = null
-          if (Math.abs(dx) > SWIPE_THRESHOLD_PX) go(index + (dx < 0 ? 1 : -1))
-        }}
       >
         {slides.map((s, i) => (
           <section
@@ -176,26 +137,20 @@ export default function SlideDeck({
             </li>
           ))}
         </ol>
-        <button
-          type="button"
-          className="deck-arrow"
-          onClick={() => go(index + 1)}
-          disabled={index === slides.length - 1}
-          aria-label="Next act"
-        >
-          ›
-        </button>
+        {index < slides.length - 1 ? (
+          <button type="button" className="deck-next" onClick={() => go(index + 1)}>
+            <span className="deck-next-label">
+              <small>Next</small>
+              {slides[index + 1].label}
+            </span>
+            <span className="deck-next-chev" aria-hidden="true">›</span>
+          </button>
+        ) : (
+          <button type="button" className="deck-arrow" disabled aria-label="Next act">
+            ›
+          </button>
+        )}
       </nav>
-
-      {index < slides.length - 1 && (
-        <button type="button" className="deck-next" onClick={() => go(index + 1)}>
-          <span className="deck-next-label">
-            <small>Next</small>
-            {slides[index + 1].label}
-          </span>
-          <span className="deck-next-chev" aria-hidden="true">›</span>
-        </button>
-      )}
     </div>
   )
 }

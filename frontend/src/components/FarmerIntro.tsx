@@ -18,8 +18,28 @@
  * notebook rather than pretending to animated handwriting we do not have.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
 import type { IntroBeat } from '../lib/intro'
+import type { FieldMode } from './seasonal/ParallaxField'
+
+const ParallaxField = lazy(() => import('./seasonal/ParallaxField'))
+
+/**
+ * The weather follows what he is saying.
+ *
+ * Keyed off the beat id rather than a timer so the picture and the words
+ * can never drift: the moment he says the rain lands on bare ground, it
+ * starts raining behind him.
+ */
+const WEATHER: Record<string, { mode: FieldMode; intensity: number }> = {
+  hello: { mode: 'calm', intensity: 0.25 },
+  bare: { mode: 'dust', intensity: 0.5 },
+  when: { mode: 'dust', intensity: 0.7 },
+  rain: { mode: 'rain', intensity: 0.95 },
+  problem: { mode: 'dust', intensity: 0.4 },
+  mine: { mode: 'calm', intensity: 0.3 },
+  ask: { mode: 'calm', intensity: 0.35 },
+}
 import { playCarriageReturn, playTypeKey } from '../lib/sound'
 import { cancelSpeech, speak } from '../lib/speech'
 import { useStore } from '../store'
@@ -32,11 +52,14 @@ const KEY_EVERY = 3
 type Stage = 'walking' | 'waving' | 'talking'
 
 export default function FarmerIntro({
+  farmId,
   beats,
   onDone,
   reducedMotion = false,
   active = true,
 }: {
+  /** Which field's satellite chip the stage stands on. */
+  farmId: string
   beats: IntroBeat[]
   onDone: () => void
   reducedMotion?: boolean
@@ -56,6 +79,7 @@ export default function FarmerIntro({
   const [shown, setShown] = useState(reducedMotion ? Infinity : 0)
   const [step, setStep] = useState(false)
   const timers = useRef<number[]>([])
+  const typeTimer = useRef(0)
   const soundOn = useStore((s) => s.soundEnabled)
 
   const text = beats[beat]?.text ?? ''
@@ -84,20 +108,30 @@ export default function FarmerIntro({
   }, [stage, reducedMotion])
 
   // Type the current line out.
+  //
+  // The interval id lives in a ref because the SKIP has to be able to stop
+  // it. Previously the closure owned a local `i` and kept calling
+  // setShown(i) on its own schedule, so setting shown to the full length
+  // was overwritten on the very next tick -- "click to skip typing" looked
+  // like it did nothing at all.
   useEffect(() => {
     if (stage !== 'talking' || reducedMotion || !active) return
     setShown(0)
     let i = 0
-    const id = window.setInterval(() => {
+    typeTimer.current = window.setInterval(() => {
       i += 1
       setShown(i)
       if (i % KEY_EVERY === 0) playTypeKey()
       if (i >= text.length) {
-        window.clearInterval(id)
+        window.clearInterval(typeTimer.current)
+        typeTimer.current = 0
         playCarriageReturn()
       }
     }, CHAR_MS)
-    return () => window.clearInterval(id)
+    return () => {
+      window.clearInterval(typeTimer.current)
+      typeTimer.current = 0
+    }
   }, [stage, beat, text, reducedMotion, active])
 
   // Read the line aloud too, when sound is on.
@@ -107,6 +141,16 @@ export default function FarmerIntro({
     return cancelSpeech
   }, [stage, beat, text, soundOn, active])
 
+  /** Stop typing and show the whole line at once. */
+  const finishLine = useCallback(() => {
+    if (typeTimer.current) {
+      window.clearInterval(typeTimer.current)
+      typeTimer.current = 0
+      playCarriageReturn()
+    }
+    setShown(text.length)
+  }, [text.length])
+
   const advance = useCallback(() => {
     if (stage !== 'talking') {
       // Impatient click during the walk-in: get straight to the words.
@@ -115,13 +159,16 @@ export default function FarmerIntro({
       return
     }
     if (!done) {
-      setShown(text.length) // finish the line rather than losing it
+      // First click completes the sentence. The voice keeps reading -- it
+      // is narration, not a subtitle, and cutting it off mid-word to show
+      // text the user can already read would be worse.
+      finishLine()
       return
     }
     cancelSpeech()
     if (last) onDone()
     else setBeat((b) => b + 1)
-  }, [stage, done, last, text.length, onDone])
+  }, [stage, done, last, finishLine, onDone])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -135,6 +182,8 @@ export default function FarmerIntro({
   }, [advance, onDone])
 
   useEffect(() => cancelSpeech, [])
+
+  const weather = WEATHER[beats[beat]?.id ?? ''] ?? { mode: 'calm' as FieldMode, intensity: 0.3 }
 
   const pose = stage === 'waving' ? 'wave' : stage === 'walking' && step ? 'wave' : 'idle'
   const facing = stage === 'walking' ? 'east' : 'south'
@@ -151,8 +200,15 @@ export default function FarmerIntro({
         if (e.key === ' ' || e.key === 'Enter') e.preventDefault()
       }}
     >
-      <div className="intro-sky" aria-hidden="true" />
-      <div className="intro-ground" aria-hidden="true" />
+      <Suspense fallback={<div className="intro-fallback" aria-hidden="true" />}>
+        <ParallaxField
+          farmId={farmId}
+          act={0}
+          mode={weather.mode}
+          intensity={weather.intensity}
+          reducedMotion={reducedMotion}
+        />
+      </Suspense>
 
       <div className="intro-actor">
         <img

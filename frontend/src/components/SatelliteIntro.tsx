@@ -14,7 +14,7 @@
  * is made somewhere even though the on-screen caption was cut.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { introNarrationParts } from '../lib/acts'
 
 import { cancelSpeech, speakScript } from '../lib/speech'
@@ -52,6 +52,28 @@ export default function SatelliteIntro({
   const [ready, setReady] = useState(false)
   const [phase, setPhase] = useState<'wide' | 'zoom' | 'gone'>('wide')
   const timers = useRef<number[]>([])
+  const handedOff = useRef(false)
+
+  /**
+   * TESTING AFFORDANCE — click anywhere to skip the descent.
+   *
+   * Added on request so the opening does not have to be sat through on
+   * every reload while the rest of the app is being worked on. There is
+   * deliberately no visible control, because the intro is meant to be
+   * unavoidable for a judge.
+   *
+   * REMOVE BEFORE SUBMISSION: delete this callback and the onClick on the
+   * root element below. Nothing else depends on it.
+   */
+  const skip = useCallback(() => {
+    if (handedOff.current) return
+    handedOff.current = true
+    cancelSpeech()
+    timers.current.forEach((id) => window.clearTimeout(id))
+    timers.current = []
+    setPhase('gone')
+    window.setTimeout(onDone, 420)
+  }, [onDone])
 
   useEffect(() => {
     let cancelled = false
@@ -86,10 +108,9 @@ export default function SatelliteIntro({
       return
     }
     const t = timers.current
-    let handedOff = false
     const handOff = () => {
-      if (handedOff) return
-      handedOff = true
+      if (handedOff.current) return
+      handedOff.current = true
       setPhase('gone')
       t.push(window.setTimeout(onDone, 700))
     }
@@ -136,7 +157,12 @@ export default function SatelliteIntro({
   const scale = Math.min(9, Math.max(3, TARGET_FRACTION / span))
 
   return (
-    <div className={`sat-intro phase-${phase}`} role="presentation">
+    <div
+      className={`sat-intro phase-${phase}`}
+      role="presentation"
+      /* TESTING: click anywhere to skip. Remove with the `skip` callback. */
+      onClick={skip}
+    >
       <div
         className="sat-frame"
         style={{

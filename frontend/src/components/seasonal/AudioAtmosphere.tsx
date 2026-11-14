@@ -23,8 +23,8 @@ export default function AudioAtmosphere({ doy }: { doy: number }) {
     useStore.getState().setSoundEnabled(value)
   }
   const [musicEnabled, setMusicEnabled] = useState(true)
-  const [ambienceVolume, setAmbienceVolume] = useState(0.28)
-  const [musicVolume, setMusicVolume] = useState(0.12)
+  const [ambienceVolume] = useState(0.28)
+  const [musicVolume] = useState(0.12)
   const players = useRef<Players | null>(null)
   const levels = useRef({ wind: 0, leaves: 0, music: 0 })
   const target = useRef({ wind: 0, leaves: 0, music: 0 })
@@ -112,12 +112,34 @@ export default function AudioAtmosphere({ doy }: { doy: number }) {
     players.current = null
   }, [])
 
-  return <div className="audio-controls">
-    <button type="button" aria-pressed={enabled} onClick={() => setEnabled((value) => !value)}>{enabled ? '♫ Sound on' : '♫ Enable sound'}</button>
-    {enabled && <div className="audio-levels">
-      <label>Ambience <input aria-label="Ambience volume" type="range" min="0" max="0.6" step="0.01" value={ambienceVolume} onChange={(e) => setAmbienceVolume(Number(e.target.value))} /></label>
-      <button type="button" className="music-toggle" aria-pressed={musicEnabled} onClick={() => setMusicEnabled((value) => !value)}>{musicEnabled ? 'Music on' : 'Music off'}</button>
-      {musicEnabled && <label>Music <input aria-label="Music volume" type="range" min="0" max="0.35" step="0.01" value={musicVolume} onChange={(e) => setMusicVolume(Number(e.target.value))} /></label>}
-    </div>}
-  </div>
+  // One control, not four. Sliders for ambience and music were three
+  // decisions the user never asked to make; the single switch kills or
+  // restores everything -- narration, interaction sound and the music bed.
+  return (
+    <button
+      type="button"
+      className="sound-toggle"
+      aria-pressed={enabled}
+      aria-label={enabled ? 'Sound on. Click to mute.' : 'Sound off. Click to unmute.'}
+      title={enabled ? 'Sound on' : 'Sound off'}
+      onClick={() => {
+        const next = !enabled
+        setEnabled(next)
+        // Muting kills the music bed too, and unmuting brings it back.
+        setMusicEnabled(next)
+      }}
+    >
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <path d="M4 9.5h3.2L12 5.4v13.2L7.2 14.5H4z" fill="currentColor" />
+        {enabled ? (
+          <>
+            <path d="M15.4 9.1a4 4 0 0 1 0 5.8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            <path d="M17.9 6.6a7.5 7.5 0 0 1 0 10.8" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+          </>
+        ) : (
+          <path d="M15.6 9.4l5 5.2M20.6 9.4l-5 5.2" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+        )}
+      </svg>
+    </button>
+  )
 }

@@ -24,11 +24,14 @@ export default function FarmerDiary({
   entries,
   reducedMotion = false,
   inline = false,
+  onOpenFull,
 }: {
   entries: DiaryEntry[]
   reducedMotion?: boolean
   /** Sit in the page flow (Act 2) rather than floating over every slide. */
   inline?: boolean
+  /** Open the full diary modal rather than the inline strip. */
+  onOpenFull?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState(Infinity)
@@ -93,6 +96,11 @@ export default function FarmerDiary({
             ))}
           </ul>
         </div>
+      )}
+      {inline && onOpenFull && (
+        <button type="button" className="diary-open-full" onClick={onOpenFull}>
+          Open the field diary &rarr;
+        </button>
       )}
     </div>
   )
