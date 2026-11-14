@@ -1,0 +1,750 @@
+{
+  "$defs": {
+    "Climatology": {
+      "additionalProperties": false,
+      "description": "All arrays indexed by DOY-1, length 365.",
+      "properties": {
+        "green_cover": {
+          "description": "From NDVI. 0-1.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Green Cover",
+          "type": "array"
+        },
+        "green_cover_p25": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Green Cover P25",
+          "type": "array"
+        },
+        "green_cover_p75": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Green Cover P75",
+          "type": "array"
+        },
+        "residue_cover": {
+          "description": "From NDTI after wet-pixel + green-pixel masking. 0-1. Moisture-sensitive -- must carry an uncertainty entry.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Residue Cover",
+          "type": "array"
+        },
+        "soil_cover": {
+          "description": "max(green_cover, residue_cover). The ONLY field the ring reads for bare/covered classification.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Soil Cover",
+          "type": "array"
+        },
+        "n_obs_per_doy": {
+          "description": "Usable satellite observations in the +/-8 day window. Drives confidence shading. 0 means no evidence -- gray it out.",
+          "items": {
+            "type": "integer"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "N Obs Per Doy",
+          "type": "array"
+        },
+        "erosivity_r": {
+          "description": "Per-DOY mean rainfall erosivity, MJ.mm/ha/h.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Erosivity R",
+          "type": "array"
+        },
+        "gdd_base4": {
+          "description": "Daily GDD, base 4 C (cool-season)",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Gdd Base4",
+          "type": "array"
+        },
+        "gdd_base10": {
+          "description": "Daily GDD, base 10 C (warm-season)",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Gdd Base10",
+          "type": "array"
+        },
+        "frost_prob": {
+          "description": "P(Tmin < 0 C)",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Frost Prob",
+          "type": "array"
+        },
+        "heat_stress_prob": {
+          "description": "P(Tmax > 32 C)",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Heat Stress Prob",
+          "type": "array"
+        },
+        "soil_moisture": {
+          "description": "SMAP, 0-1. COARSE (9-11 km) -- regional flag only, never presented as a field-scale number.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Soil Moisture",
+          "type": "array"
+        }
+      },
+      "required": [
+        "green_cover",
+        "green_cover_p25",
+        "green_cover_p75",
+        "residue_cover",
+        "soil_cover",
+        "n_obs_per_doy",
+        "erosivity_r",
+        "gdd_base4",
+        "gdd_base10",
+        "frost_prob",
+        "heat_stress_prob",
+        "soil_moisture"
+      ],
+      "title": "Climatology",
+      "type": "object"
+    },
+    "CropCurve": {
+      "additionalProperties": false,
+      "description": "A median NDVI-by-DOY curve measured across real nearby fields.\n\nThis is the project's strongest scientific card: we never simulate what a\ncover crop would look like. We measure fields that already grow it.",
+      "properties": {
+        "green_cover": {
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Green Cover",
+          "type": "array"
+        },
+        "n_fields": {
+          "description": "How many real fields went into the median",
+          "minimum": 1,
+          "title": "N Fields",
+          "type": "integer"
+        },
+        "source": {
+          "default": "observed",
+          "enum": [
+            "observed",
+            "literature"
+          ],
+          "title": "Source",
+          "type": "string"
+        },
+        "detection": {
+          "description": "Exactly how these fields were identified, in one sentence",
+          "title": "Detection",
+          "type": "string"
+        }
+      },
+      "required": [
+        "green_cover",
+        "n_fields",
+        "detection"
+      ],
+      "title": "CropCurve",
+      "type": "object"
+    },
+    "Farm": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "description": "Slug, e.g. 'story-county-ia'",
+          "title": "Id",
+          "type": "string"
+        },
+        "owner_name": {
+          "description": "The named farmer. Not 'farmers worldwide'.",
+          "title": "Owner Name",
+          "type": "string"
+        },
+        "place": {
+          "description": "Named place, e.g. 'Story County, Iowa'",
+          "title": "Place",
+          "type": "string"
+        },
+        "centroid": {
+          "description": "[lon, lat]",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Centroid",
+          "type": "array"
+        },
+        "area_ha": {
+          "exclusiveMinimum": 0,
+          "title": "Area Ha",
+          "type": "number"
+        },
+        "polygon_geojson": {
+          "additionalProperties": true,
+          "title": "Polygon Geojson",
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "owner_name",
+        "place",
+        "centroid",
+        "area_ha",
+        "polygon_geojson"
+      ],
+      "title": "Farm",
+      "type": "object"
+    },
+    "Gap": {
+      "additionalProperties": false,
+      "description": "A contiguous run of DOYs with soil_cover < BARE_THRESHOLD.\n\nMay wrap the new year: if start_doy > end_doy the gap runs through\n31 Dec. Every consumer must handle the wrap -- the biggest gap in a\ncorn-soy rotation is exactly the one that wraps.",
+      "properties": {
+        "start_doy": {
+          "maximum": 365,
+          "minimum": 1,
+          "title": "Start Doy",
+          "type": "integer"
+        },
+        "end_doy": {
+          "maximum": 365,
+          "minimum": 1,
+          "title": "End Doy",
+          "type": "integer"
+        },
+        "n_days": {
+          "exclusiveMinimum": 0,
+          "maximum": 365,
+          "title": "N Days",
+          "type": "integer"
+        },
+        "exposed_r": {
+          "description": "Cover-weighted erosivity accumulated across the gap",
+          "minimum": 0,
+          "title": "Exposed R",
+          "type": "number"
+        },
+        "share_of_annual_r": {
+          "maximum": 1.0,
+          "minimum": 0.0,
+          "title": "Share Of Annual R",
+          "type": "number"
+        },
+        "wraps_year": {
+          "default": false,
+          "title": "Wraps Year",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "start_doy",
+        "end_doy",
+        "n_days",
+        "exposed_r",
+        "share_of_annual_r"
+      ],
+      "title": "Gap",
+      "type": "object"
+    },
+    "ObservedRotation": {
+      "additionalProperties": false,
+      "properties": {
+        "years": {
+          "items": {
+            "$ref": "#/$defs/ObservedYear"
+          },
+          "minItems": 1,
+          "title": "Years",
+          "type": "array"
+        },
+        "inferred_label": {
+          "description": "e.g. 'Corn-Soybean, no cover'",
+          "title": "Inferred Label",
+          "type": "string"
+        }
+      },
+      "required": [
+        "years",
+        "inferred_label"
+      ],
+      "title": "ObservedRotation",
+      "type": "object"
+    },
+    "ObservedYear": {
+      "additionalProperties": false,
+      "properties": {
+        "year": {
+          "title": "Year",
+          "type": "integer"
+        },
+        "cdl_crop": {
+          "description": "USDA CDL class name, e.g. 'Corn'",
+          "title": "Cdl Crop",
+          "type": "string"
+        },
+        "cdl_code": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cdl Code"
+        },
+        "planting_doy": {
+          "anyOf": [
+            {
+              "maximum": 365,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "From NDVI green-up inflection",
+          "title": "Planting Doy"
+        },
+        "harvest_doy": {
+          "anyOf": [
+            {
+              "maximum": 365,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "From NDVI senescence inflection",
+          "title": "Harvest Doy"
+        },
+        "cover_crop_detected": {
+          "default": false,
+          "description": "Winter NDVI above threshold between harvest and next planting. CDL does not label cover crops; the satellite does.",
+          "title": "Cover Crop Detected",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "year",
+        "cdl_crop"
+      ],
+      "title": "ObservedYear",
+      "type": "object"
+    },
+    "Provenance": {
+      "additionalProperties": false,
+      "properties": {
+        "generated_at": {
+          "format": "date-time",
+          "title": "Generated At",
+          "type": "string"
+        },
+        "years_used": {
+          "items": {
+            "type": "integer"
+          },
+          "minItems": 1,
+          "title": "Years Used",
+          "type": "array"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/Source"
+          },
+          "minItems": 1,
+          "title": "Sources",
+          "type": "array"
+        },
+        "pipeline_version": {
+          "default": "1.0",
+          "title": "Pipeline Version",
+          "type": "string"
+        },
+        "is_synthetic": {
+          "default": false,
+          "description": "True for the H2 fixture. The UI MUST show a banner when this is set -- we never want to demo fake data by accident.",
+          "title": "Is Synthetic",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "generated_at",
+        "years_used",
+        "sources"
+      ],
+      "title": "Provenance",
+      "type": "object"
+    },
+    "Rotation": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "sequence": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Sequence",
+          "type": "array"
+        },
+        "is_current": {
+          "default": false,
+          "description": "Exactly one rotation is the farmer's current",
+          "title": "Is Current",
+          "type": "boolean"
+        },
+        "soil_cover": {
+          "description": "Spliced from observed crop curves. Never simulated.",
+          "items": {
+            "type": "number"
+          },
+          "maxItems": 365,
+          "minItems": 365,
+          "title": "Soil Cover",
+          "type": "array"
+        },
+        "bare_days": {
+          "maximum": 365,
+          "minimum": 0,
+          "title": "Bare Days",
+          "type": "integer"
+        },
+        "exposed_r": {
+          "minimum": 0,
+          "title": "Exposed R",
+          "type": "number"
+        },
+        "delta_vs_current_pct": {
+          "description": "Negative is better (less exposed erosivity)",
+          "title": "Delta Vs Current Pct",
+          "type": "number"
+        },
+        "added_seed_cost_usd_ha": {
+          "default": 0.0,
+          "title": "Added Seed Cost Usd Ha",
+          "type": "number"
+        },
+        "n_credit_kg_ha": {
+          "default": 0.0,
+          "title": "N Credit Kg Ha",
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "sequence",
+        "soil_cover",
+        "bare_days",
+        "exposed_r",
+        "delta_vs_current_pct"
+      ],
+      "title": "Rotation",
+      "type": "object"
+    },
+    "Source": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "collection_id": {
+          "description": "e.g. COPERNICUS/S2_SR_HARMONIZED",
+          "title": "Collection Id",
+          "type": "string"
+        },
+        "n_obs": {
+          "description": "Usable observations after masking",
+          "minimum": 0,
+          "title": "N Obs",
+          "type": "integer"
+        },
+        "resolution_m": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Resolution M"
+        },
+        "citation": {
+          "title": "Citation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "collection_id",
+        "n_obs",
+        "citation"
+      ],
+      "title": "Source",
+      "type": "object"
+    },
+    "Species": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "seeding_window": {
+          "description": "[earliest, latest] DOY",
+          "maxItems": 2,
+          "minItems": 2,
+          "prefixItems": [
+            {
+              "maximum": 365,
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "maximum": 365,
+              "minimum": 1,
+              "type": "integer"
+            }
+          ],
+          "title": "Seeding Window",
+          "type": "array"
+        },
+        "tbase_c": {
+          "description": "Base temperature for GDD accumulation",
+          "title": "Tbase C",
+          "type": "number"
+        },
+        "gdd_establish": {
+          "description": "GDD from seeding to established",
+          "exclusiveMinimum": 0,
+          "title": "Gdd Establish",
+          "type": "number"
+        },
+        "winterkill_c": {
+          "description": "Temperature below which the stand dies. -99 = winter hardy.",
+          "title": "Winterkill C",
+          "type": "number"
+        },
+        "water_mm": {
+          "description": "Water needed to establish",
+          "minimum": 0,
+          "title": "Water Mm",
+          "type": "number"
+        },
+        "n_credit_kg_ha": {
+          "description": "Nitrogen credit to the following cash crop",
+          "minimum": 0,
+          "title": "N Credit Kg Ha",
+          "type": "number"
+        },
+        "biomass_kg_ha": {
+          "description": "Typical above-ground biomass",
+          "minimum": 0,
+          "title": "Biomass Kg Ha",
+          "type": "number"
+        },
+        "seed_cost_usd_ha": {
+          "minimum": 0,
+          "title": "Seed Cost Usd Ha",
+          "type": "number"
+        },
+        "winter_hardy": {
+          "title": "Winter Hardy",
+          "type": "boolean"
+        },
+        "citation": {
+          "title": "Citation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "seeding_window",
+        "tbase_c",
+        "gdd_establish",
+        "winterkill_c",
+        "water_mm",
+        "n_credit_kg_ha",
+        "biomass_kg_ha",
+        "seed_cost_usd_ha",
+        "winter_hardy",
+        "citation"
+      ],
+      "title": "Species",
+      "type": "object"
+    },
+    "Uncertainty": {
+      "additionalProperties": false,
+      "description": "The brief scores this. Render it prominently; do not bury it.",
+      "properties": {
+        "field": {
+          "description": "Which bundle field this qualifies",
+          "title": "Field",
+          "type": "string"
+        },
+        "level": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "title": "Level",
+          "type": "string"
+        },
+        "reason": {
+          "description": "Plain language, one or two sentences",
+          "title": "Reason",
+          "type": "string"
+        },
+        "affects": {
+          "description": "What a farmer should do about it",
+          "title": "Affects",
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "level",
+        "reason",
+        "affects"
+      ],
+      "title": "Uncertainty",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "farm": {
+      "$ref": "#/$defs/Farm"
+    },
+    "provenance": {
+      "$ref": "#/$defs/Provenance"
+    },
+    "climatology": {
+      "$ref": "#/$defs/Climatology"
+    },
+    "observed_rotation": {
+      "$ref": "#/$defs/ObservedRotation"
+    },
+    "gaps": {
+      "items": {
+        "$ref": "#/$defs/Gap"
+      },
+      "title": "Gaps",
+      "type": "array"
+    },
+    "crop_curves": {
+      "additionalProperties": {
+        "$ref": "#/$defs/CropCurve"
+      },
+      "title": "Crop Curves",
+      "type": "object"
+    },
+    "species": {
+      "items": {
+        "$ref": "#/$defs/Species"
+      },
+      "minItems": 1,
+      "title": "Species",
+      "type": "array"
+    },
+    "rotations": {
+      "items": {
+        "$ref": "#/$defs/Rotation"
+      },
+      "minItems": 2,
+      "title": "Rotations",
+      "type": "array"
+    },
+    "uncertainty": {
+      "items": {
+        "$ref": "#/$defs/Uncertainty"
+      },
+      "minItems": 1,
+      "title": "Uncertainty",
+      "type": "array"
+    }
+  },
+  "required": [
+    "farm",
+    "provenance",
+    "climatology",
+    "observed_rotation",
+    "gaps",
+    "crop_curves",
+    "species",
+    "rotations",
+    "uncertainty"
+  ],
+  "title": "Bundle",
+  "type": "object"
+}

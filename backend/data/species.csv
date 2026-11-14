@@ -1,0 +1,34 @@
+﻿# Cover crop species parameters -- Midwest / Iowa calibration
+#
+# !! STARTING TABLE, NOT A VERIFIED ONE !!
+# Values below are reasonable Midwest extension figures assembled to unblock
+# the build. Every row needs checking against SARE "Managing Cover Crops
+# Profitably" 3rd ed. (free PDF from sare.org) and the page number written
+# into the citation column. The `verified` column is the checklist.
+#
+# B2 owns this file (plan bottleneck B11). Budget half a day. Cap at 12
+# species -- twelve is plenty for a demo and this expands if you let it.
+#
+# Columns:
+#   seed_start_doy / seed_end_doy : seeding window, day of year
+#   tbase_c          : base temperature for GDD accumulation
+#   gdd_establish    : GDD (at tbase_c) from seeding to an established stand
+#   winterkill_c     : temp at which the stand dies; -99 = reliably hardy here
+#   water_mm         : water needed to establish
+#   n_credit_kg_ha   : N credited to the following cash crop (legumes only)
+#   biomass_kg_ha    : typical above-ground dry matter
+#   seed_cost_usd_ha : seed only, not drilling
+#
+id,name,seed_start_doy,seed_end_doy,tbase_c,gdd_establish,winterkill_c,water_mm,n_credit_kg_ha,biomass_kg_ha,seed_cost_usd_ha,winter_hardy,verified,citation
+cereal_rye,Cereal rye,227,319,4.0,200,-99,25,0,3400,62,true,false,SARE MCCP 3rd ed. -- page TBD
+winter_wheat,Winter wheat,244,293,4.0,220,-99,25,0,2200,70,true,false,SARE MCCP 3rd ed. -- page TBD
+triticale,Triticale,238,300,4.0,210,-99,25,0,2800,75,true,false,SARE MCCP 3rd ed. -- page TBD
+winter_barley,Winter barley,238,288,4.0,220,-18,25,0,2000,68,false,false,SARE MCCP 3rd ed. -- page TBD
+oats,Oats,213,258,4.0,250,-8,30,0,1800,50,false,false,SARE MCCP 3rd ed. -- page TBD
+annual_ryegrass,Annual ryegrass,213,266,4.0,230,-15,30,0,2000,55,false,false,SARE MCCP 3rd ed. -- page TBD
+hairy_vetch,Hairy vetch,213,258,4.0,300,-99,35,110,2500,120,true,false,SARE MCCP 3rd ed. -- page TBD
+crimson_clover,Crimson clover,213,252,4.0,280,-15,35,85,2200,95,false,false,SARE MCCP 3rd ed. -- page TBD
+red_clover,Red clover,60,250,4.0,320,-99,40,90,2400,88,true,false,SARE MCCP 3rd ed. -- page TBD -- often frost-seeded into small grain
+austrian_winter_pea,Austrian winter pea,227,266,4.0,290,-18,40,75,2000,110,false,false,SARE MCCP 3rd ed. -- page TBD
+forage_radish,Forage radish,213,252,4.0,150,-7,30,0,2600,78,false,false,SARE MCCP 3rd ed. -- page TBD -- winterkills, leaves channels
+buckwheat,Buckwheat,152,227,10.0,300,0,30,0,1500,60,false,false,SARE MCCP 3rd ed. -- page TBD -- summer gap only, frost kills
