@@ -757,6 +757,35 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .pane-main .soil-cutaway { flex: 1; min-height: 0; display: flex; align-items: center; }
 .pane-main .soil-cutaway svg { max-height: 100%; }
 
+/* Act two gives the crop-phase explanation a year view of its own. */
+.pane-desk .pane-grid { grid-template-columns: minmax(0, 1fr); }
+.pane-desk .desk-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; width: 100%; max-width: none; }
+.pane-desk .desk-head p { max-width: 78ch; }
+.pane-desk .desk-head .farmer-diary { flex: none; }
+.pane-desk .desk-head .diary-pages { max-height: 180px; }
+.pane-desk .desk-readout { min-height: 0; }
+.phase-year-chart { flex: 1; min-height: 180px; display: flex; flex-direction: column; margin: 0; padding: 16px 20px 11px; border: 1px solid #a8c7ad; border-radius: 16px; background: #fbfcf3; box-shadow: 0 9px 28px #1a625719; }
+.phase-year-chart figcaption { display: flex; align-items: end; justify-content: space-between; gap: 12px; }
+.phase-year-chart figcaption > div { display: flex; flex-direction: column; gap: 3px; }
+.phase-year-chart figcaption strong { color: #2c4b3c; font: 700 20px/1.15 Georgia, serif; }
+.phase-chart-day { color: #2c4b3c; font: 700 18px/1 Georgia, serif; white-space: nowrap; }
+.phase-chart-legend { display: flex; flex-wrap: wrap; gap: 5px 18px; margin-top: 10px; color: #526657; font: 600 11px/1.3 system-ui; }
+.phase-chart-legend span::before { content: ''; display: inline-block; width: 17px; height: 3px; margin: 0 6px 3px 0; border-radius: 4px; background: var(--series-color); }
+.phase-chart-plot { flex: 1; min-height: 85px; display: flex; gap: 9px; margin-top: 10px; }
+.phase-chart-axis { display: flex; flex-direction: column; justify-content: space-between; flex: none; width: 35px; color: #708071; font: 10px/1 system-ui; text-align: right; }
+.phase-chart-plot svg { width: 100%; height: 100%; overflow: visible; }
+.phase-chart-gridline { stroke: #d7e2d4; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.phase-chart-bare-band { fill: #eee1cb6b; }
+.phase-chart-series { stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.phase-chart-average { stroke-width: 3.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.phase-chart-marker { stroke: #375647; stroke-width: 1.5; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.phase-chart-dot { stroke: #fffdf5; stroke-width: 2; vector-effect: non-scaling-stroke; }
+.phase-chart-months { display: flex; justify-content: space-between; margin: 2px 0 0 44px; color: #6b786d; font: 10px/1.2 system-ui; }
+.phase-year-chart p { margin: 9px 0 0; color: #617163; font: 11px/1.35 system-ui; }
+@media (max-width: 900px), (max-height: 620px) {
+  .phase-year-chart { min-height: 320px; }
+}
+
 .pane-futures { gap: 8px; }
 .pane-futures .split-core { flex: 1; min-height: 0; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .pane-futures .split-core .section-heading { display: none; }
@@ -880,7 +909,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 /* --- Act two: his act, so he gets the floor ------------------------- */
 /* The pane keeps a 150px lane clear at the bottom and he stands in it at
    full size. Nothing is overlapped because the space is reserved first. */
-.pane-desk { padding-bottom: 162px; }
+.pane-desk { padding-bottom: 110px; }
 .site-shell[data-act='desk'] .farmer-guide { width: min(620px, 56vw); height: 230px; align-items: flex-end; padding-bottom: 6px; }
 .site-shell[data-act='desk'] .farmer-sprite,
 .site-shell[data-act='desk'] .farmer-sprite img { width: 192px; height: 192px; }
@@ -1277,4 +1306,121 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 
 @media (max-width: 900px), (max-height: 620px) {
   .legend-ask { position: static; width: 100%; justify-content: flex-start; margin-top: 8px; }
+}
+
+/* The root-zone view uses the width of its stage and gives each action a clear role. */
+.pane-root .pane-grid { grid-template-columns: minmax(0, 1.55fr) minmax(340px, .85fr); }
+.pane-root .soil-cutaway { width: 100%; border: 1px solid #b5cbb8; background: linear-gradient(180deg, #d7e8db 0%, #e6efe3 35%, #aa8b67 35%, #aa8b67 100%); box-shadow: 0 14px 34px #234b3530, inset 0 0 0 1px #ffffffa6; }
+.pane-root .soil-cutaway svg { width: 100%; height: 100%; max-height: none; }
+.soil-scene-head { position: absolute; z-index: 1; top: 16px; left: 20px; right: 20px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none; }
+.soil-scene-head > div { display: flex; flex-direction: column; gap: 2px; }
+.soil-scene-head strong { color: #294b3e; font: 700 clamp(18px, 1.7vw, 26px)/1.1 Georgia, serif; }
+.soil-scene-status { padding: 7px 12px; border: 1px solid #bdd3bb; border-radius: 99px; background: #f8fcf1db; color: #2e6847; font: 700 11px/1 system-ui; white-space: nowrap; }
+.soil-scene-status.is-at-risk { border-color: #d9ad83; background: #fff1dbeb; color: #915126; }
+.soil-scene-labels { position: absolute; inset: 0; pointer-events: none; }
+.soil-scene-labels span { position: absolute; padding: 4px 8px; border-radius: 5px; background: #2e241bbd; color: #fff7e7; font: 700 10px/1.1 system-ui; letter-spacing: .035em; text-transform: uppercase; white-space: nowrap; }
+.soil-scene-labels .soil-scene-residue { left: 16px; transform: translateY(-115%); background: #f6edc6e6; color: #59472b; }
+.soil-scene-topsoil { top: 37%; left: 16px; }
+.soil-scene-roots { top: 37%; right: 16px; }
+.soil-scene-subsoil { top: 69%; left: 16px; }
+.soil-scene-labels .soil-scene-water { right: 16px; transform: translateY(-120%); background: #dbeef5e8; color: #305a72; }
+
+.pane-root .storm-run { display: flex; width: 100%; min-height: 56px; margin-top: 0; padding: 7px 16px; border: 1px solid #245b48; border-radius: 15px; background: #246b53; color: #fffaf0; box-shadow: 0 8px 20px #1b5a4230; text-align: left; letter-spacing: 0; }
+.pane-root .storm-run:hover:not(:disabled) { border-color: #1f5c47; background: #1e5945; }
+.pane-root .storm-run:disabled { opacity: .75; }
+.storm-run-icon { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 10px; background: #ffffff2a; color: #f7d88b; font: 700 25px/1 Georgia, serif; }
+.storm-run > span:nth-child(2) { display: flex; flex: 1; flex-direction: column; gap: 3px; font: 700 13px/1.1 system-ui; }
+.storm-run small { color: #d9eadb; font: 500 10px/1.2 system-ui; }
+.storm-run-arrow { margin-left: auto; color: #d9eadb; font: 20px/1 system-ui; }
+
+.pane-root .notes-card { padding: 20px 22px 15px; border-color: #c8d8c4; background: #fffdf6; }
+.pane-root .notes-card-title { margin-bottom: 7px; padding-bottom: 13px; }
+.pane-root .notes-card h3 { margin: 2px 0 0; font-size: 23px; line-height: 1.1; }
+.pane-root .fit-list li { gap: 12px; min-height: 54px; padding: 8px 10px; border-bottom: 1px solid #e4e9dc; }
+.pane-root .fit-list li:first-child { margin: 4px -8px 0; padding-inline: 18px; border: 1px solid #b9d6bd; border-radius: 12px; background: #edf7e9; }
+.pane-root .fit-list li:first-child + li { border-top: 0; }
+.pane-root .fit-list li.unavailable { opacity: .65; }
+.pane-root .fit-number { width: 20px; color: #9e8968; font-size: 12px; }
+.pane-root .fit-list strong { font-size: 13px; line-height: 1.25; }
+.pane-root .fit-list small { margin-top: 3px; font-size: 10.5px; line-height: 1.25; }
+.pane-root .fit-benefit { min-width: 46px; color: #286b4c; font-size: 17px; text-align: right; }
+.pane-root .fit-more { margin-top: 9px; }
+.pane-root .soil-caption { margin: 0; padding: 11px 13px; border-left: 3px solid #7fa98c; border-radius: 0 10px 10px 0; background: #f6f8ed; color: #506755; font-size: 11px; line-height: 1.45; }
+
+@media (max-width: 900px), (max-height: 620px) {
+  .pane-root .pane-grid { grid-template-columns: 1fr; }
+  .pane-root .soil-cutaway { aspect-ratio: 7 / 3; min-height: 250px; }
+}
+@media (max-width: 600px) {
+  .pane-root .soil-cutaway { min-height: 220px; }
+  .soil-scene-head { top: 11px; left: 12px; right: 12px; }
+  .soil-scene-head strong { font-size: 16px; }
+  .soil-scene-status { padding: 5px 7px; font-size: 9px; }
+}
+
+/* Act four: all three outcomes share the page width and the same visual scale. */
+.pane-futures .split-core { width: 100%; max-width: none; }
+.pane-futures .split-grid { width: 100%; gap: clamp(10px, 1vw, 18px); }
+.pane-futures .split-panel { min-width: 0; padding: 15px; border-color: #cedbcb; box-shadow: 0 10px 24px #4666481c; }
+.pane-futures .split-panel[data-selected='true'] { border-color: #438566; box-shadow: inset 0 0 0 1px #438566, 0 12px 25px #2c6d4d29; }
+.pane-futures .split-panel header { flex: none; min-height: 60px; margin-bottom: 8px; }
+.pane-futures .split-panel h3 { font-size: clamp(15px, 1.25vw, 19px); line-height: 1.15; }
+.pane-futures .split-panel .soil-cutaway { flex: 1; min-height: 115px; width: 100%; box-shadow: none; }
+.pane-futures .split-panel .soil-cutaway svg { width: 100%; height: 100%; }
+.pane-futures .split-metrics { flex: none; gap: 4px; margin-top: 10px; padding-top: 9px; border-top: 1px solid #e3e9dc; }
+.pane-futures .split-metrics dt { font-size: 9px; }
+.pane-futures .split-metrics dd { font-size: clamp(16px, 1.2vw, 21px); }
+.pane-futures .split-phases { flex: none; margin-top: 6px; font-size: 10px; }
+.pane-futures .tier-chips { margin-top: 2px; }
+.pane-futures .tier-chip { padding: 2px 6px; font-size: 8px; }
+.pane-futures .source-strip { flex: none; gap: 5px; margin: 0; }
+.pane-futures .source-strip li { padding: 3px 8px; font-size: 10px; background: #f8f9f1; }
+
+@media (max-width: 980px) {
+  .pane-futures .split-grid { grid-template-columns: 1fr; }
+  .pane-futures .split-panel .soil-cutaway { min-height: 190px; }
+}
+
+.pane-futures { overflow-y: auto; overscroll-behavior: contain; }
+.pane-futures .split-core { flex: 1 0 355px; }
+
+/* Give the three headline measurements their own small, scannable widgets. */
+.pane-futures .split-panel-actions { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+.pane-futures .split-tag { margin: 0; }
+.split-select { flex: none; min-height: 27px; padding: 0 9px; border: 1px solid #bdd3bd; border-radius: 999px; background: #f6faf1; color: #286849; font: 700 10px/1 system-ui; cursor: pointer; }
+.split-select:hover { background: #e7f3e5; border-color: #8db49a; }
+.split-select[aria-pressed='true'] { border-color: #3b8160; background: #ddefda; }
+.split-select:focus-visible { outline: 2px solid #1f6f43; outline-offset: 2px; }
+.pane-futures .split-metrics { gap: 7px; padding-top: 10px; }
+.pane-futures .split-metrics div { min-height: 54px; padding: 8px 10px; border: 1px solid #e0e8db; border-radius: 10px; background: #f5f8ef; }
+.pane-futures .split-metrics dt { color: #637668; }
+.pane-futures .split-metrics dd { margin-top: 4px; }
+.pane-futures .split-phases { padding-left: 3px; }
+
+.pane-futures .comparison-note { flex: none; margin-top: 6px; color: #536b58; font: 11px/1.4 system-ui; }
+.pane-futures .comparison-note summary { width: max-content; cursor: pointer; font-weight: 700; }
+.pane-futures .comparison-note p { max-width: 100ch; margin: 5px 0 0; }
+
+.futures-detail-row { flex: none; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.pane-futures .rotation-compare, .futures-sources { min-width: 0; margin: 0; padding: 0; border: 1px solid #c4d6c4; border-radius: 13px; background: #fbfcf5; box-shadow: 0 5px 15px #3c654716; }
+.pane-futures .rotation-compare summary, .futures-sources summary { display: flex; flex-direction: column; gap: 3px; position: relative; min-height: 52px; padding: 10px 34px 9px 13px; cursor: pointer; list-style: none; }
+.pane-futures .rotation-compare summary::-webkit-details-marker, .futures-sources summary::-webkit-details-marker { display: none; }
+.pane-futures .rotation-compare summary::after, .futures-sources summary::after { content: '+'; position: absolute; top: 12px; right: 13px; color: #39795b; font: 700 20px/1 system-ui; }
+.pane-futures .rotation-compare[open] summary::after, .futures-sources[open] summary::after { content: '−'; }
+.pane-futures .rotation-compare summary strong, .futures-sources summary strong { color: #315542; font: 700 13px/1.15 Georgia, serif; }
+.pane-futures .rotation-compare summary small, .futures-sources summary small { color: #6d7d6d; font: 10px/1.2 system-ui; }
+.pane-futures .rotation-compare[open], .futures-sources[open] { max-height: 180px; overflow-y: auto; }
+.rotation-evidence-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 0 12px 8px; }
+.rotation-evidence { padding: 9px; border: 1px solid #e0e8db; border-radius: 9px; background: white; }
+.rotation-evidence > strong { color: #315542; font: 700 11px/1.25 system-ui; }
+.rotation-evidence .tier-chips { margin-top: 5px; }
+.pane-futures .rotation-compare p { margin: 0; padding: 0 12px 10px; color: #647467; font: 10px/1.35 system-ui; }
+.pane-futures .futures-sources .source-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0 12px 10px; }
+.pane-futures .futures-sources .source-strip li { border-radius: 8px; }
+
+@media (max-width: 980px) {
+  .futures-detail-row { grid-template-columns: 1fr; }
+  .rotation-evidence-list, .pane-futures .futures-sources .source-strip { grid-template-columns: 1fr; }
+  .pane-futures { overflow: visible; }
+  .pane-futures .split-core { flex: none; }
 }

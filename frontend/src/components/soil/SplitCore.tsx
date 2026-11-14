@@ -37,6 +37,8 @@ export interface SplitScenario {
 export interface SplitCoreProps {
   doy: number
   scenarios: SplitScenario[]
+  selectedId?: string | null
+  onSelect?: (id: string | null) => void
   greenCover: number[]
   residueCover: number[]
   soilMoisture: number[]
@@ -56,6 +58,8 @@ function livingCoverFor(scenario: number[], baseline: number[], green: number[])
 export default function SplitCore({
   doy,
   scenarios,
+  selectedId = null,
+  onSelect,
   greenCover,
   residueCover,
   soilMoisture,
@@ -91,9 +95,12 @@ export default function SplitCore({
               : null
 
           return (
-            <article key={s.id} className={`split-panel ${s.isCurrent ? 'is-current' : ''}`}>
+            <article key={s.id} className={`split-panel ${s.isCurrent ? 'is-current' : ''}`} data-selected={selectedId === (s.isCurrent ? null : s.id) ? 'true' : 'false'}>
               <header>
-                <span className="split-tag">{s.isCurrent ? 'Today' : `Option ${i}`}</span>
+                <div className="split-panel-actions">
+                  <span className="split-tag">{s.isCurrent ? 'Today' : `Option ${i}`}</span>
+                  {onSelect && <button type="button" className="split-select" aria-pressed={selectedId === (s.isCurrent ? null : s.id)} onClick={() => onSelect(s.isCurrent ? null : s.id)}>{selectedId === (s.isCurrent ? null : s.id) ? 'On year wheel ✓' : 'View on year wheel →'}</button>}
+                </div>
                 <h3>{s.label}</h3>
               </header>
 
@@ -141,12 +148,10 @@ export default function SplitCore({
         })}
       </div>
 
-      <p className="soil-caption">
-        All three panels share one erosivity scale, so the pictures are comparable.
-        Root depth is <strong>derived</strong> from each scenario&apos;s own cover — the
-        schema carries cover per rotation, not greenness, so this is a proxy and not a
-        measurement.
-      </p>
+      <details className="comparison-note">
+        <summary>How to read these soil pictures</summary>
+        <p>All three panels share one erosivity scale, so the pictures are comparable. Root depth is <strong>derived</strong> from each scenario&apos;s own cover. It is a proxy, not a measurement.</p>
+      </details>
     </section>
   )
 }

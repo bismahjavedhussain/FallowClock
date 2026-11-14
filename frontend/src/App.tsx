@@ -6,6 +6,7 @@ import TimeLever from './components/TimeLever'
 import CropPlanner from './components/CropPlanner'
 import AudioAtmosphere from './components/seasonal/AudioAtmosphere'
 import AtmosphereReadout from './components/seasonal/AtmosphereReadout'
+import PhaseYearChart from './components/PhaseYearChart'
 import FarmerGuide from './components/FarmerGuide'
 import FieldNotes from './components/FieldNotes'
 import SoilCutaway from './components/soil/SoilCutaway'
@@ -100,7 +101,7 @@ const FALLBACK_URL = '/bundles/farm_synthetic.json'
 export default function App() {
   const [bundle, setBundle] = useState<Bundle | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const { selectedRotationId, selectRotation, hoveredDoy, setHoveredDoy, selectedDoy, setSelectedDoy, draggingSpeciesId, setDraggingSpecies, placedFills, addPlacedFill, removePlacedFill, resetPlacedFills, reducedMotion, setReducedMotion } = useStore()
+  const { selectedRotationId, selectRotation, setHoveredDoy, selectedDoy, setSelectedDoy, draggingSpeciesId, setDraggingSpecies, placedFills, addPlacedFill, removePlacedFill, resetPlacedFills, reducedMotion, setReducedMotion } = useStore()
   const [mode, setMode] = useState<'2D' | '3D'>('3D')
   const [farmId, setFarmId] = useState<string>(FARMS[0].id)
   const [notesOpen, setNotesOpen] = useState(false)
@@ -553,19 +554,16 @@ export default function App() {
 
       {/* ---------------- Act 2 - the farmer's desk ---------------- */}
       <div className="act-pane pane-desk">
-        <div className="act-head">
+        <div className="act-head desk-head">
           <p>{acts[1].line}</p>
+          <FarmerDiary entries={diary} reducedMotion={reducedMotion} inline onOpenFull={() => setDiaryOpen(true)} />
         </div>
         <div className="pane-grid">
           <div className="pane-main desk-readout">
             <AtmosphereReadout doy={selectedDoy} climate={clim} synthetic={bundle.provenance.is_synthetic} />
-            <p className="ring-caption">{hoveredDoy ? `DOY ${hoveredDoy} · ${clim.n_obs_per_doy[hoveredDoy - 1] > 0 ? `soil cover ${(ringCover[hoveredDoy - 1] * 100).toFixed(0)}%` : 'soil cover unknown'} · ${clim.n_obs_per_doy[hoveredDoy - 1]} ${bundle.provenance.is_synthetic ? 'simulated' : 'observations'}` : 'Hover a day on the wheel in Act one, or scrub below.'}</p>
-            {phaseCovers && phaseLabels && phaseCovers.length === phaseLabels.length && <p className="ring-caption phase-caption">This day by rotation phase: {phaseCovers.map((pc, i) => `${phaseLabels[i]} ${(pc[selectedDoy - 1] * 100).toFixed(0)}% (${pc[selectedDoy - 1] < 0.3 ? 'bare' : 'covered'})`).join(' \u00b7 ')}. The ring shows their mean, so a day can read covered here and still sit inside a gap that is bare in one phase.</p>}
+            <PhaseYearChart average={clim.soil_cover} phases={phaseCovers} labels={phaseLabels} doy={selectedDoy} />
             <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
           </div>
-          <aside className="pane-side">
-            <FarmerDiary entries={diary} reducedMotion={reducedMotion} inline onOpenFull={() => setDiaryOpen(true)} />
-          </aside>
         </div>
       </div>
 
@@ -577,7 +575,9 @@ export default function App() {
         <div className="pane-grid">
           <div className="pane-main">
             <button type="button" className="storm-run" onClick={runStorm} disabled={storm > 0}>
-              {storm > 0 ? 'Storm running\u2026' : `\u26c8 Run the year's worst storm (${doyToDate(worstStormDoy).label})`}
+              <span className="storm-run-icon" aria-hidden="true">↯</span>
+              <span>{storm > 0 ? 'Storm running…' : "Run the year's worst storm"}<small>{doyToDate(worstStormDoy).label} · watch the soil respond</small></span>
+              <span className="storm-run-arrow" aria-hidden="true">→</span>
             </button>
             <SoilCutaway doy={selectedDoy} greenCover={livingCover} residueCover={clim.residue_cover} soilCover={shownCover} soilMoisture={clim.soil_moisture} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} label={bundle.farm.place} reducedMotion={reducedMotion} />
             <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
@@ -596,6 +596,8 @@ export default function App() {
         </div>
         <SplitCore
           doy={selectedDoy}
+          selectedId={selectedRotationId}
+          onSelect={(id) => { playSwitch(); selectRotation(id) }}
           scenarios={bundle.rotations.map((r) => ({
             id: r.id,
             label: r.label,
@@ -615,32 +617,24 @@ export default function App() {
           phaseLabels={phaseLabels}
           reducedMotion={reducedMotion}
         />
-        <ul className="source-strip" aria-label="Data sources">
-          {sourceLines(bundle.provenance.sources).map((src, i) => (
-            <li key={i} data-nasa={src.nasa ? 'yes' : 'no'}>
-              <strong>{src.name}</strong> {src.gives}{src.count ? ` \u00b7 ${src.count}` : ''}
-            </li>
-          ))}
-        </ul>
-        <RotationCompare
-          rotations={bundle.rotations.map((r) => ({
-            id: r.id,
-            label: r.label,
-            isCurrent: r.is_current,
-            sequence: r.sequence,
-            bareDays: r.bare_days,
-            bareDaysByPhase: r.bare_days_by_phase ?? null,
-            seedCostUsdHa: r.added_seed_cost_usd_ha,
-            nCreditKgHa: r.n_credit_kg_ha,
-            deltaPct: r.delta_vs_current_pct,
-          }))}
-          speciesNames={new Map(bundle.species.map((sp) => [sp.id, sp.name]))}
-          cropCurves={bundle.crop_curves}
-          observedCurveIds={new Set(Object.keys(bundle.crop_curves))}
-          phaseLabels={phaseLabels}
-          selectedId={selectedRotationId}
-          onSelect={(id) => { playSwitch(); selectRotation(id) }}
-        />
+        <div className="futures-detail-row">
+          <RotationCompare
+            rotations={bundle.rotations.map((r) => ({ id: r.id, label: r.label, isCurrent: r.is_current, sequence: r.sequence }))}
+            speciesNames={new Map(bundle.species.map((sp) => [sp.id, sp.name]))}
+            cropCurves={bundle.crop_curves}
+            observedCurveIds={new Set(Object.keys(bundle.crop_curves))}
+          />
+          <details className="futures-sources">
+            <summary><strong>Data sources</strong><small>Where these field values come from</small></summary>
+            <ul className="source-strip" aria-label="Data sources">
+              {sourceLines(bundle.provenance.sources).map((src, i) => (
+                <li key={i} data-nasa={src.nasa ? 'yes' : 'no'}>
+                  <strong>{src.name}</strong> {src.gives}{src.count ? ` \u00b7 ${src.count}` : ''}
+                </li>
+              ))}
+            </ul>
+          </details>
+        </div>
       </div>
 
     </SlideDeck>
