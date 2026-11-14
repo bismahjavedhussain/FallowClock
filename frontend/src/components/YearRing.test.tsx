@@ -304,6 +304,7 @@ describe('RingLegend Component', () => {
     expect(html).toContain('Bare Soil')
     expect(html).toContain('Unknown / Masked')
     expect(html).toContain('Erosion Risk (Overlay)')
-    expect(html).toContain('soil_cover = max(green_cover, residue_cover)')
+    expect(html).toContain('soil_cover')
+    expect(html).toContain('Missing observations remain unknown')
   })
 })

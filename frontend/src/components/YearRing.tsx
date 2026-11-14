@@ -17,7 +17,7 @@
 
 import React, { Suspense, useCallback, useId, useMemo, useRef, useState, lazy } from 'react'
 import RingLegend from './RingLegend'
-import { isWebGLAvailable } from '../lib/webgl'
+import { KILLING_FROST_PROB } from '../lib/cropFit'
 
 const YearRing3D = lazy(() => import('./YearRing3D'))
 
@@ -41,12 +41,17 @@ export interface YearRingProps {
   initialMode?: '2D' | '3D'
   onHoverDay?: (doy: number | null) => void
   onSelectDay?: (doy: number) => void
+  onActivateDay?: (doy: number) => void
+  onModeChange?: (mode: '2D' | '3D') => void
+  reducedMotion?: boolean
+  synthetic?: boolean
+  showLegend?: boolean
 }
 
 export type DayClassification = 'covered' | 'bare' | 'unknown'
 
 export function classifyDay(soilCover: number, nObs: number): DayClassification {
-  if (nObs <= 0) return 'unknown'
+  if (nObs <= 0 || !Number.isFinite(soilCover)) return 'unknown'
   if (soilCover < BARE_THRESHOLD) return 'bare'
   return 'covered'
 }
@@ -86,10 +91,10 @@ export interface BareRun {
   wraps: boolean
 }
 
-export function findBareRuns(soilCover: number[], threshold = BARE_THRESHOLD): BareRun[] {
+export function findBareRuns(soilCover: number[], threshold = BARE_THRESHOLD, nObs?: number[]): BareRun[] {
   const len = soilCover.length
   if (len === 0) return []
-  const bare = soilCover.map((v) => v < threshold)
+  const bare = soilCover.map((v, i) => Number.isFinite(v) && v < threshold && (nObs?.[i] ?? 1) > 0)
   if (!bare.some(Boolean)) return []
   if (bare.every(Boolean)) {
     return [{ startDoy: 1, endDoy: len, nDays: len, wraps: false }]
@@ -174,7 +179,7 @@ function lerp(a: readonly number[], b: readonly number[], t: number): string {
 }
 
 export function coverColor(cover: number, nObs = 10): string {
-  if (nObs <= 0) return UNKNOWN_HEX
+  if (nObs <= 0 || !Number.isFinite(cover)) return UNKNOWN_HEX
   if (cover < BARE_THRESHOLD) return `rgb(${BARE_RGB[0]},${BARE_RGB[1]},${BARE_RGB[2]})`
   const t = Math.min(1, Math.max(0, (cover - BARE_THRESHOLD) / (1 - BARE_THRESHOLD)))
   return lerp(COVER_LOW_RGB, COVER_HIGH_RGB, t)
@@ -201,6 +206,11 @@ export default function YearRing({
   initialMode = '2D',
   onHoverDay,
   onSelectDay,
+  onActivateDay,
+  onModeChange,
+  reducedMotion = false,
+  synthetic = false,
+  showLegend = true,
 }: YearRingProps) {
   const [mode, setMode] = useState<'2D' | '3D'>(initialMode)
   const [internalHovered, setInternalHovered] = useState<number | null>(null)
@@ -264,8 +274,8 @@ export default function YearRing({
   )
 
   const bareRuns = useMemo(
-    () => findBareRuns(soilCover, BARE_THRESHOLD),
-    [soilCover],
+    () => findBareRuns(soilCover, BARE_THRESHOLD, nObs),
+    [soilCover, nObs],
   )
 
   const longestGap = useMemo(() => {
@@ -274,12 +284,12 @@ export default function YearRing({
   }, [bareRuns])
 
   const lastSpringFrost = useMemo(() => {
-    for (let i = 180; i >= 0; i--) if (frostProb[i] >= 0.5) return i + 1
+    for (let i = 180; i >= 0; i--) if (frostProb[i] >= KILLING_FROST_PROB) return i + 1
     return null
   }, [frostProb])
 
   const firstFallFrost = useMemo(() => {
-    for (let i = 200; i < DOY_LEN; i++) if (frostProb[i] >= 0.5) return i + 1
+    for (let i = 200; i < DOY_LEN; i++) if (frostProb[i] >= KILLING_FROST_PROB) return i + 1
     return null
   }, [frostProb])
 
@@ -293,6 +303,19 @@ export default function YearRing({
     [cx, cy],
   )
 
+  const dayAtClientPoint = useCallback((clientX: number, clientY: number): number | null => {
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    const scale = size / rect.width
+    const x = (clientX - rect.left) * scale - cx
+    const y = (clientY - rect.top) * scale - cy
+    const dist = Math.hypot(x, y)
+    if (dist < rCoverInner * 0.85 || dist > rRiskMax * 1.08) return null
+    let angle = Math.atan2(x, -y)
+    if (angle < 0) angle += Math.PI * 2
+    return Math.min(DOY_LEN, Math.floor((angle / (Math.PI * 2)) * DOY_LEN) + 1)
+  }, [size, cx, cy, rCoverInner, rRiskMax])
+
   // Hover: rAF-throttled
   const handleMove = useCallback(
     (e: React.PointerEvent<SVGSVGElement>) => {
@@ -300,25 +323,17 @@ export default function YearRing({
       const { clientX, clientY } = e
       rafRef.current = requestAnimationFrame(() => {
         rafRef.current = null
-        const rect = svgRef.current?.getBoundingClientRect()
-        if (!rect) return
-        const scale = size / rect.width
-        const x = (clientX - rect.left) * scale - cx
-        const y = (clientY - rect.top) * scale - cy
-        const dist = Math.hypot(x, y)
-        if (dist < rCoverInner * 0.85 || dist > rRiskMax * 1.08) {
+        const doy = dayAtClientPoint(clientX, clientY)
+        if (!doy) {
           setInternalHovered(null)
           onHoverDay?.(null)
           return
         }
-        let angle = Math.atan2(x, -y)
-        if (angle < 0) angle += Math.PI * 2
-        const doy = Math.min(DOY_LEN, Math.floor((angle / (Math.PI * 2)) * DOY_LEN) + 1)
         setInternalHovered(doy)
         onHoverDay?.(doy)
       })
     },
-    [cx, cy, rCoverInner, rRiskMax, size, onHoverDay],
+    [dayAtClientPoint, onHoverDay],
   )
 
   const handleLeave = useCallback(() => {
@@ -348,9 +363,12 @@ export default function YearRing({
         setInternalSelected(null)
         setInternalHovered(null)
         onHoverDay?.(null)
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault()
+        onActivateDay?.(current)
       }
     },
-    [activeSelectedDoy, activeHoveredDoy, handleSelect, onHoverDay],
+    [activeSelectedDoy, activeHoveredDoy, handleSelect, onHoverDay, onActivateDay],
   )
 
   // Inspection day data for tooltip
@@ -382,30 +400,28 @@ export default function YearRing({
   }, [activeDay, soilCover, nObs, erosivity, frostProb, greenCover, residueCover])
 
   const switchTo3D = () => {
-    if (!isWebGLAvailable()) {
-      setWebglError('WebGL is not available in your current browser session.')
-      return
-    }
     setWebglError(null)
     setMode('3D')
+    onModeChange?.('3D')
   }
 
   const switchTo2D = () => {
     setWebglError(null)
     setMode('2D')
+    onModeChange?.('2D')
   }
 
   return (
     <div
       ref={containerRef}
-      className="flex flex-col items-center gap-4 focus:outline-none"
+      className="year-ring-root flex flex-col items-center gap-4 focus:outline-none"
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="region"
       aria-label="Interactive Year Ring agricultural calendar"
     >
       {/* 2D / 3D Mode Toggle Header */}
-      <div className="flex w-full flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-3">
+      <div className="year-ring-controls flex w-full flex-wrap items-center justify-between gap-3 border-b border-black/10 pb-3">
         <div className="flex items-center gap-2">
           <span className="text-xs font-semibold uppercase tracking-wider text-ink-soft">
             Visualization Mode:
@@ -446,20 +462,22 @@ export default function YearRing({
           <kbd className="rounded border border-black/15 bg-white px-1.5 py-0.5 font-mono text-[10px]">
             &larr; &rarr;
           </kbd>
-          <span>Scrub DOY</span>
+                <span>Scrub DOY</span>
         </div>
       </div>
 
       {/* Main Visualization Display */}
       {mode === '2D' ? (
-        <div className="relative w-full max-w-[620px]">
+        <div className="year-ring-stage year-ring-stage-2d relative w-full">
           <svg
             ref={svgRef}
             viewBox={`0 0 ${size} ${size}`}
             className="h-auto w-full select-none touch-none drop-shadow-sm"
             onPointerMove={handleMove}
             onPointerLeave={handleLeave}
-            onClick={() => activeHoveredDoy && handleSelect(activeHoveredDoy)}
+            onClick={() => { if (activeHoveredDoy) { handleSelect(activeHoveredDoy); onActivateDay?.(activeHoveredDoy) } }}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => { e.preventDefault(); e.stopPropagation(); const day = dayAtClientPoint(e.clientX, e.clientY); if (day) { handleSelect(day); onActivateDay?.(day) } }}
             role="img"
             aria-label={`Year ring: this field is bare on ${bareDaysCount} of 365 days`}
           >
@@ -531,7 +549,7 @@ export default function YearRing({
                         i * step,
                         (i + 1) * step,
                       )}
-                      fill={coverColor(v, 10)}
+                      fill={coverColor(v, nObs[i] ?? 0)}
                     />
                   )
                 })}
@@ -696,10 +714,10 @@ export default function YearRing({
           </svg>
         </div>
       ) : (
-        <div className="w-full max-w-[620px]">
+        <div className="year-ring-stage year-ring-stage-3d w-full">
           <Suspense
             fallback={
-              <div className="flex h-[500px] w-full flex-col items-center justify-center rounded-xl border border-black/10 bg-paper text-ink-soft">
+              <div className="flex h-full w-full flex-col items-center justify-center rounded-xl border border-black/10 bg-paper text-ink-soft">
                 <div className="h-6 w-6 animate-spin rounded-full border-2 border-canopy-deep border-t-transparent" />
                 <span className="mt-2 text-xs font-medium">Loading 3D Engine…</span>
               </div>
@@ -719,9 +737,12 @@ export default function YearRing({
                 onHoverDay?.(d)
               }}
               onSelectDay={handleSelect}
+              onActivateDay={onActivateDay}
+              reducedMotion={reducedMotion}
               onWebGLUnavailable={() => {
-                setWebglError('WebGL is unsupported on this system. Falling back to 2D.')
+                setWebglError('WebGL is unavailable in this browser session. Using 2D.')
                 setMode('2D')
+                onModeChange?.('2D')
               }}
             />
           </Suspense>
@@ -731,7 +752,7 @@ export default function YearRing({
       {/* Interactive Floating Day Inspection Tooltip */}
       {inspectedData && (
         <div
-          className="w-full max-w-[620px] rounded-lg border border-black/10 bg-white/95 p-3.5 shadow-sm backdrop-blur transition-all"
+          className="year-ring-tooltip w-full max-w-[620px] rounded-lg border border-black/10 bg-white/95 p-3.5 shadow-sm backdrop-blur transition-all"
           role="status"
           aria-live="polite"
         >
@@ -773,7 +794,7 @@ export default function YearRing({
             <div>
               <div className="text-[11px] text-ink-soft">Soil Cover (Decision)</div>
               <div className="font-mono text-sm font-semibold text-ink">
-                {(inspectedData.soilCover * 100).toFixed(1)}%
+                {inspectedData.nObs > 0 ? `${(inspectedData.soilCover * 100).toFixed(1)}%` : 'Unknown'}
               </div>
             </div>
 
@@ -794,7 +815,7 @@ export default function YearRing({
             </div>
 
             <div>
-              <div className="text-[11px] text-ink-soft">Satellite Passes</div>
+              <div className="text-[11px] text-ink-soft">{synthetic ? 'Simulated Cover Samples' : 'Satellite Passes'}</div>
               <div className="font-mono text-sm font-semibold text-ink">
                 {inspectedData.nObs}{' '}
                 <span className="text-[10px] font-normal text-ink-soft">obs</span>
@@ -824,9 +845,7 @@ export default function YearRing({
       )}
 
       {/* Ring Scientific Legend Component */}
-      <div className="w-full max-w-[620px]">
-        <RingLegend compact={false} />
-      </div>
+      {showLegend && <div className="year-ring-legend w-full max-w-[620px]"><RingLegend compact={false} /></div>}
     </div>
   )
 }

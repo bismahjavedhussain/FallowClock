@@ -1,24 +1,10 @@
-/**
- * YearRing3D.tsx — 3D WebGL Year Ring visualization using Three.js.
- *
- * Owned by U1 (The Ring).
- * Renders an elevated 3D physical agricultural ring with 365 daily segments:
- * - Annular 3D structure with extruded segments
- * - Soil cover color coding (green = covered, brown = bare, grey = unknown)
- * - Physical elevation corresponding to rainfall erosivity R
- * - Smooth Orbit/Pitch controls with clamped tilt and zoom limits
- * - Raycasting/polar day picking for hover and selection
- * - 3D Month billboard labels and camera reset button
- * - Graceful WebGL fallback if WebGL is unavailable
- * - Full resource disposal on unmount to prevent memory leaks
- */
-
-import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { PointerEvent as ReactPointerEvent } from 'react'
 import * as THREE from 'three'
-import { isWebGLAvailable } from '../lib/webgl'
-
-const DOY_LEN = 365
-const BARE_THRESHOLD = 0.3
+import { createProceduralTree } from './seasonal/ProceduralTree'
+import { createAtmosphereDetails } from './seasonal/AtmosphereDetails'
+import { seasonWeights } from '../lib/seasons'
+import { DAYS_IN_RING, DAY_STEP, dayMatrix, wedgeGeometry } from './yearRing3dGeometry'
 
 export interface YearRing3DProps {
   soilCover: number[]
@@ -31,457 +17,352 @@ export interface YearRing3DProps {
   hoveredDoy: number | null
   onHoverDay?: (doy: number | null) => void
   onSelectDay?: (doy: number) => void
+  onActivateDay?: (doy: number) => void
   onWebGLUnavailable?: () => void
+  reducedMotion?: boolean
 }
 
 export const MONTH_START_DOYS = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
-export const MONTH_NAMES = [
-  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-]
+export const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-/** Colors in Three.js Color format */
-const COLOR_BARE = new THREE.Color(0x8a, 0x62, 0x40) // #8a6240
-const COLOR_COVER_LOW = new THREE.Color(0xa0, 0xbe, 0x78) // #a0be78
-const COLOR_COVER_HIGH = new THREE.Color(0x1f, 0x6f, 0x43) // #1f6f43
-const COLOR_UNKNOWN = new THREE.Color(0x9c, 0xa3, 0xaf) // #9ca3af neutral grey
-const COLOR_SELECTED = new THREE.Color(0xf5, 0xd5, 0x47) // #f5d547
-const COLOR_COMPARE_BARE = new THREE.Color(0x5c, 0x41, 0x2a)
-const COLOR_COMPARE_COVER = new THREE.Color(0x2f, 0x9e, 0x5f)
+const bare = new THREE.Color('#8a6240')
+const coverLow = new THREE.Color('#a0be78')
+const coverHigh = new THREE.Color('#1f6f43')
+const unknown = new THREE.Color('#9ca3af')
+const selected = new THREE.Color('#f5d547')
+const hovered = new THREE.Color('#f9df79')
+const candidate = new THREE.Color('#ead072')
+const compareBare = new THREE.Color('#5c412a')
+const compareCovered = new THREE.Color('#2f9e5f')
+const colorScratch = new THREE.Color()
 
-function getDayColor(cover: number, n: number): THREE.Color {
-  if (n <= 0) return COLOR_UNKNOWN.clone()
-  if (cover < BARE_THRESHOLD) return COLOR_BARE.clone()
-  const t = Math.min(1, Math.max(0, (cover - BARE_THRESHOLD) / (1 - BARE_THRESHOLD)))
-  return COLOR_COVER_LOW.clone().lerp(COLOR_COVER_HIGH, t)
+export function dayColor(cover: number, observations: number, target = new THREE.Color()): THREE.Color {
+  if (observations <= 0 || !Number.isFinite(cover)) return target.copy(unknown)
+  if (cover < 0.3) return target.copy(bare)
+  return target.copy(coverLow).lerp(coverHigh, Math.max(0, Math.min(1, (cover - 0.3) / 0.7)))
 }
 
-export const YearRing3D: React.FC<YearRing3DProps> = ({
-  soilCover,
-  erosivity,
-  nObs,
-  compareCover,
-  highlightDoys,
-  selectedDoy,
-  hoveredDoy,
-  onHoverDay,
-  onSelectDay,
-  onWebGLUnavailable,
-}) => {
+export function instanceIdToDoy(instanceId: number | undefined): number | null {
+  return instanceId !== undefined && instanceId >= 0 && instanceId < DAYS_IN_RING ? instanceId + 1 : null
+}
+
+function monthLabels(scene: THREE.Scene) {
+  const group = new THREE.Group()
+  const textures: THREE.CanvasTexture[] = []
+  const materials: THREE.Material[] = []
+  const geometries: THREE.BufferGeometry[] = []
+  MONTH_START_DOYS.forEach((start, index) => {
+    const next = index === 11 ? 366 : MONTH_START_DOYS[index + 1]
+    const mid = start + (next - start) / 2
+    const angle = (mid - 1) * DAY_STEP
+    const x = 10.1 * Math.sin(angle)
+    const z = -10.1 * Math.cos(angle)
+    const pinGeo = new THREE.CylinderGeometry(0.035, 0.035, 0.35, 6)
+    const pinMat = new THREE.MeshBasicMaterial({ color: '#607767' })
+    const pin = new THREE.Mesh(pinGeo, pinMat)
+    pin.position.set(x, 0.17, z)
+    group.add(pin)
+    geometries.push(pinGeo)
+    materials.push(pinMat)
+    const surface = document.createElement('canvas')
+    surface.width = 128; surface.height = 64
+    const ctx = surface.getContext('2d')
+    if (!ctx) return
+    ctx.fillStyle = '#fffaf0'
+    ctx.beginPath(); ctx.roundRect(3, 3, 122, 58, 14); ctx.fill()
+    ctx.fillStyle = '#315142'
+    ctx.font = 'bold 28px system-ui'
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle'
+    ctx.fillText(MONTH_NAMES[index], 64, 32)
+    const texture = new THREE.CanvasTexture(surface)
+    texture.colorSpace = THREE.SRGBColorSpace
+    const material = new THREE.SpriteMaterial({ map: texture, depthTest: false })
+    const sprite = new THREE.Sprite(material)
+    sprite.position.set(x * 1.075, 0.55, z * 1.075)
+    sprite.scale.set(1.55, 0.77, 1)
+    group.add(sprite)
+    textures.push(texture); materials.push(material)
+  })
+  scene.add(group)
+  return () => {
+    scene.remove(group)
+    textures.forEach((texture) => texture.dispose())
+    materials.forEach((material) => material.dispose())
+    geometries.forEach((geometry) => geometry.dispose())
+  }
+}
+
+export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, highlightDoys, selectedDoy, hoveredDoy, onHoverDay, onSelectDay, onActivateDay, onWebGLUnavailable, reducedMotion = false }: YearRing3DProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  const isDraggingRef = useRef(false)
-  const prevPointerRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 })
-  const cameraAngleRef = useRef({ theta: Math.PI / 4, phi: Math.PI / 3.4, radius: 24 })
-  const targetLookAt = useRef(new THREE.Vector3(0, 0, 0))
-
-  const [webglSupported, setWebglSupported] = useState(true)
-  const animFrameRef = useRef<number | null>(null)
-  const sceneRef = useRef<THREE.Scene | null>(null)
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
-  const dayMeshesRef = useRef<THREE.Mesh[]>([])
-  const innerMeshesRef = useRef<THREE.Mesh[]>([])
+  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
+  const ringRef = useRef<THREE.InstancedMesh | null>(null)
+  const compareRef = useRef<THREE.InstancedMesh | null>(null)
+  const seasonRef = useRef(selectedDoy)
+  const motionRef = useRef(reducedMotion)
+  const fallbackRef = useRef(onWebGLUnavailable)
+  const anglesRef = useRef({ theta: 0.38, phi: 0.92, radius: 29 })
+  const dragRef = useRef({ active: false, moved: false, x: 0, y: 0, startX: 0, startY: 0 })
+  const raycasterRef = useRef(new THREE.Raycaster())
+  const pointerRef = useRef(new THREE.Vector2())
+  const lastHoverRef = useRef<number | null>(null)
+  const hoverFrameRef = useRef(0)
+  const [webglSupported, setWebglSupported] = useState(true)
+  seasonRef.current = selectedDoy
+  motionRef.current = reducedMotion
+  fallbackRef.current = onWebGLUnavailable
 
-  const highlightSet = useMemo(
-    () => (highlightDoys ? new Set(highlightDoys) : null),
-    [highlightDoys],
-  )
+  const highlightSet = useMemo(() => new Set(highlightDoys ?? []), [highlightDoys])
 
-  const maxErosivity = useMemo(
-    () => Math.max(...erosivity, 1e-6),
-    [erosivity],
-  )
-
-  // Verify WebGL availability on mount
-  useEffect(() => {
-    if (!isWebGLAvailable()) {
-      setWebglSupported(false)
-      onWebGLUnavailable?.()
-    }
-  }, [onWebGLUnavailable])
-
-  // Setup Three.js scene
   useEffect(() => {
     if (!webglSupported || !containerRef.current || !canvasRef.current) return
-
     const container = containerRef.current
     const canvas = canvasRef.current
-    const width = container.clientWidth || 600
-    const height = Math.max(container.clientHeight || 520, 480)
-
-    // 1. Scene & Camera
-    const scene = new THREE.Scene()
-    sceneRef.current = scene
-    scene.background = new THREE.Color(0xfb, 0xf9, 0xf6) // Soft paper background
-
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 100)
-    cameraRef.current = camera
-
-    // 2. Renderer
-    const renderer = new THREE.WebGLRenderer({
-      canvas,
-      antialias: true,
-      alpha: true,
-      powerPreference: 'high-performance',
-    })
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.setSize(width, height)
+    let renderer: THREE.WebGLRenderer
+    try {
+      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
+    } catch {
+      setWebglSupported(false)
+      fallbackRef.current?.()
+      return
+    }
+    rendererRef.current = renderer
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5))
+    renderer.outputColorSpace = THREE.SRGBColorSpace
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
-    rendererRef.current = renderer
+    const scene = new THREE.Scene()
+    scene.background = new THREE.Color('#f9eee0')
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 90)
+    cameraRef.current = camera
+    const ambient = new THREE.AmbientLight('#ffffff', 1.2)
+    const sun = new THREE.DirectionalLight('#fff1d0', 2)
+    sun.position.set(9, 16, 11)
+    sun.castShadow = true
+    sun.shadow.mapSize.set(512, 512)
+    sun.shadow.camera.near = 0.5
+    sun.shadow.camera.far = 50
+    sun.shadow.camera.left = -17; sun.shadow.camera.right = 17
+    sun.shadow.camera.top = 17; sun.shadow.camera.bottom = -17
+    scene.add(ambient, sun)
+    const trees = [createProceduralTree(scene, -12, -7, 1.25, 115, 0.45), createProceduralTree(scene, 12, -6, 1.4, 316, 0.45)]
+    const atmosphere = createAtmosphereDetails(scene, 122, 0.28)
+    const floorGeo = new THREE.PlaneGeometry(32, 32)
+    const floorMat = new THREE.ShadowMaterial({ opacity: 0.13 })
+    const floor = new THREE.Mesh(floorGeo, floorMat)
+    floor.rotation.x = -Math.PI / 2
+    floor.position.y = -0.04
+    floor.receiveShadow = true
+    scene.add(floor)
 
-    // 3. Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75)
-    scene.add(ambientLight)
-
-    const sunLight = new THREE.DirectionalLight(0xfff7ea, 1.2)
-    sunLight.position.set(12, 20, 15)
-    sunLight.castShadow = true
-    sunLight.shadow.mapSize.width = 1024
-    sunLight.shadow.mapSize.height = 1024
-    sunLight.shadow.camera.near = 0.5
-    sunLight.shadow.camera.far = 50
-    sunLight.shadow.bias = -0.0005
-    scene.add(sunLight)
-
-    const fillLight = new THREE.DirectionalLight(0xdce7f0, 0.4)
-    fillLight.position.set(-15, -10, -10)
-    scene.add(fillLight)
-
-    // 4. Ground subtle shadow plane
-    const shadowGeo = new THREE.PlaneGeometry(32, 32)
-    const shadowMat = new THREE.ShadowMaterial({ opacity: 0.15 })
-    const shadowPlane = new THREE.Mesh(shadowGeo, shadowMat)
-    shadowPlane.rotation.x = -Math.PI / 2
-    shadowPlane.position.y = -0.8
-    shadowPlane.receiveShadow = true
-    scene.add(shadowPlane)
-
-    // 5. Build Ring Geometry for 365 Days
-    // Radii in 3D units
-    const rInner = 6.2
-    const rOuter = 8.6
-    const baseThickness = 0.55
-    const erosivityMaxHeight = 1.6
-
-    const dayMeshes: THREE.Mesh[] = []
-
-    for (let i = 0; i < DOY_LEN; i++) {
-      const a0 = (i / DOY_LEN) * Math.PI * 2
-      const a1 = ((i + 1) / DOY_LEN) * Math.PI * 2
-
-      // Erosivity height elevation on outer edge
-      const erosFactor = (erosivity[i] ?? 0) / maxErosivity
-      const extraHeight = Math.max(0.05, erosFactor * erosivityMaxHeight)
-      const height = baseThickness + extraHeight
-
-      // Create wedge shape
-      const shape = new THREE.Shape()
-      const segSteps = 4
-      for (let s = 0; s <= segSteps; s++) {
-        const a = a0 + (a1 - a0) * (s / segSteps)
-        const x = rOuter * Math.sin(a)
-        const z = -rOuter * Math.cos(a)
-        if (s === 0) shape.moveTo(x, z)
-        else shape.lineTo(x, z)
-      }
-      for (let s = segSteps; s >= 0; s++) {
-        const a = a0 + (a1 - a0) * (s / segSteps)
-        const x = rInner * Math.sin(a)
-        const z = -rInner * Math.cos(a)
-        shape.lineTo(x, z)
-      }
-      shape.closePath()
-
-      const geom = new THREE.ExtrudeGeometry(shape, {
-        depth: height,
-        bevelEnabled: true,
-        bevelSegments: 2,
-        steps: 1,
-        bevelSize: 0.02,
-        bevelThickness: 0.02,
-      })
-      // Rotate geometry so depth extrudes along Y (upwards)
-      geom.rotateX(Math.PI / 2)
-
-      const color = getDayColor(soilCover[i] ?? 0, nObs[i] ?? 0)
-      const mat = new THREE.MeshStandardMaterial({
-        color,
-        roughness: 0.55,
-        metalness: 0.12,
-      })
-
-      const mesh = new THREE.Mesh(geom, mat)
-      mesh.castShadow = true
-      mesh.receiveShadow = true
-      mesh.userData = { doy: i + 1 }
-      scene.add(mesh)
-      dayMeshes.push(mesh)
+    const dayGeo = wedgeGeometry(6.2, 8.6)
+    const dayMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.7, metalness: 0.02 })
+    const ring = new THREE.InstancedMesh(dayGeo, dayMat, DAYS_IN_RING)
+    ring.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+    ring.castShadow = true
+    ring.receiveShadow = true
+    ring.frustumCulled = false
+    scene.add(ring)
+    ringRef.current = ring
+    const initialMax = Math.max(1e-6, ...erosivity.filter(Number.isFinite))
+    const matrix = new THREE.Matrix4()
+    const initialHighlights = new Set(highlightDoys ?? [])
+    for (let i = 0; i < DAYS_IN_RING; i++) {
+      const risk = Number.isFinite(erosivity[i]) ? Math.max(0, erosivity[i]) / initialMax : 0
+      ring.setMatrixAt(i, dayMatrix(i, 0.5 + risk * 1.5, matrix))
+      ring.setColorAt(i, i + 1 === selectedDoy ? selected : i + 1 === hoveredDoy ? hovered : initialHighlights.has(i + 1) ? candidate : dayColor(soilCover[i], nObs[i] ?? 0, colorScratch))
     }
-    dayMeshesRef.current = dayMeshes
+    ring.instanceMatrix.needsUpdate = true
+    if (ring.instanceColor) ring.instanceColor.needsUpdate = true
 
-    // 6. Candidate Rotation Inner Band
-    if (compareCover && compareCover.length >= DOY_LEN) {
-      const innerMeshes: THREE.Mesh[] = []
-      const rCompIn = 5.4
-      const rCompOut = 6.0
-      for (let i = 0; i < DOY_LEN; i++) {
-        const a0 = (i / DOY_LEN) * Math.PI * 2
-        const a1 = ((i + 1) / DOY_LEN) * Math.PI * 2
-        const shape = new THREE.Shape()
-        shape.moveTo(rCompOut * Math.sin(a0), -rCompOut * Math.cos(a0))
-        shape.lineTo(rCompOut * Math.sin(a1), -rCompOut * Math.cos(a1))
-        shape.lineTo(rCompIn * Math.sin(a1), -rCompIn * Math.cos(a1))
-        shape.lineTo(rCompIn * Math.sin(a0), -rCompIn * Math.cos(a0))
-        shape.closePath()
-
-        const geom = new THREE.ExtrudeGeometry(shape, {
-          depth: 0.35,
-          bevelEnabled: false,
-        })
-        geom.rotateX(Math.PI / 2)
-
-        const v = compareCover[i]
-        const mat = new THREE.MeshStandardMaterial({
-          color: v < BARE_THRESHOLD ? COLOR_COMPARE_BARE : COLOR_COMPARE_COVER,
-          roughness: 0.65,
-        })
-        const mesh = new THREE.Mesh(geom, mat)
-        scene.add(mesh)
-        innerMeshes.push(mesh)
-      }
-      innerMeshesRef.current = innerMeshes
+    const compareGeo = wedgeGeometry(5.42, 5.98, 0.18)
+    const compareMat = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.83 })
+    const comparison = new THREE.InstancedMesh(compareGeo, compareMat, DAYS_IN_RING)
+    comparison.instanceMatrix.setUsage(THREE.StaticDrawUsage)
+    comparison.frustumCulled = false
+    comparison.count = 0
+    for (let i = 0; i < DAYS_IN_RING; i++) comparison.setMatrixAt(i, dayMatrix(i, 1))
+    comparison.instanceMatrix.needsUpdate = true
+    if (compareCover?.length === DAYS_IN_RING) {
+      comparison.count = DAYS_IN_RING
+      for (let i = 0; i < DAYS_IN_RING; i++) comparison.setColorAt(i, (nObs[i] ?? 0) <= 0 ? unknown : compareCover[i] < 0.3 ? compareBare : compareCovered)
+      if (comparison.instanceColor) comparison.instanceColor.needsUpdate = true
     }
+    scene.add(comparison)
+    compareRef.current = comparison
+    const disposeLabels = monthLabels(scene)
 
-    // 7. Month Billboards / Markers
-    const monthGroup = new THREE.Group()
-    const rMonth = rOuter + 1.2
-    for (let m = 0; m < 12; m++) {
-      const doy = MONTH_START_DOYS[m]
-      const a = ((doy - 0.5) / DOY_LEN) * Math.PI * 2
-      const x = rMonth * Math.sin(a)
-      const z = -rMonth * Math.cos(a)
-
-      // Month marker small pin
-      const pinGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.5, 8)
-      const pinMat = new THREE.MeshBasicMaterial({ color: 0x6b625a })
-      const pin = new THREE.Mesh(pinGeo, pinMat)
-      pin.position.set(x, 0.25, z)
-      monthGroup.add(pin)
+    const updateCamera = () => {
+      const { theta, phi, radius } = anglesRef.current
+      // A narrow canvas has a narrower horizontal field of view. Keep the
+      // complete wheel visible without changing the user's zoom setting.
+      const framedRadius = radius * Math.max(1, 1.1 / camera.aspect)
+      camera.position.set(framedRadius * Math.sin(phi) * Math.sin(theta), framedRadius * Math.cos(phi), framedRadius * Math.sin(phi) * Math.cos(theta))
+      camera.lookAt(0, 0, 0)
+      camera.updateMatrixWorld()
     }
-    scene.add(monthGroup)
-
-    // 8. Render loop
-    const updateCameraPos = () => {
-      const { theta, phi, radius } = cameraAngleRef.current
-      const x = radius * Math.sin(phi) * Math.sin(theta)
-      const y = radius * Math.cos(phi)
-      const z = radius * Math.sin(phi) * Math.cos(theta)
-      camera.position.set(x, y, z)
-      camera.lookAt(targetLookAt.current)
+    const resize = () => {
+      const rect = container.getBoundingClientRect()
+      if (!rect.width || !rect.height) return
+      renderer.setSize(rect.width, rect.height, false)
+      camera.aspect = rect.width / rect.height
+      camera.updateProjectionMatrix()
+      updateCamera()
     }
-
-    const render = () => {
-      updateCameraPos()
-      renderer.render(scene, camera)
-      animFrameRef.current = requestAnimationFrame(render)
-    }
-    render()
-
-    // 9. Resize Observer
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (const entry of entries) {
-        const w = entry.contentRect.width
-        const h = Math.max(entry.contentRect.height, 460)
-        camera.aspect = w / h
-        camera.updateProjectionMatrix()
-        renderer.setSize(w, h)
-      }
-    })
+    const resizeObserver = new ResizeObserver(resize)
     resizeObserver.observe(container)
+    resize()
 
-    // Cleanup on unmount or rebuild
+    const current = seasonWeights(seasonRef.current ?? 274)
+    const clock = new THREE.Clock()
+    const skyWarm = new THREE.Color('#f9eee0')
+    const skyCool = new THREE.Color('#e8f2fa')
+    const sunWarm = new THREE.Color('#fff1d0')
+    const sunCool = new THREE.Color('#dbe8ff')
+    let visible = true
+    let frame = 0
+    let running = false
+    const render = () => {
+      if (!visible || document.hidden) { running = false; return }
+      running = true
+      frame = requestAnimationFrame(render)
+      updateCamera()
+      const target = seasonWeights(seasonRef.current ?? 274)
+      const easing = motionRef.current ? 1 : 0.025
+      for (const key of Object.keys(current) as (keyof typeof current)[]) current[key] += (target[key] - current[key]) * easing
+      const time = clock.getElapsedTime()
+      trees.forEach((tree) => tree.update(time, current, motionRef.current))
+      atmosphere.update(time, current, motionRef.current)
+      ;(scene.background as THREE.Color).copy(skyWarm).lerp(skyCool, current.winter)
+      sun.color.copy(sunWarm).lerp(sunCool, current.winter)
+      renderer.render(scene, camera)
+    }
+    const start = () => { if (!running && visible && !document.hidden) render() }
+    const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; if (visible) start() })
+    observer.observe(container)
+    const visibilityChanged = () => { if (!document.hidden) start() }
+    document.addEventListener('visibilitychange', visibilityChanged)
+    const contextLost = (event: Event) => { event.preventDefault(); setWebglSupported(false); fallbackRef.current?.() }
+    canvas.addEventListener('webglcontextlost', contextLost)
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault()
+      anglesRef.current.radius = Math.max(19, Math.min(43, anglesRef.current.radius + event.deltaY * 0.014))
+    }
+    container.addEventListener('wheel', wheel, { passive: false })
+    start()
+
     return () => {
-      resizeObserver.disconnect()
-      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
-
-      // Dispose day meshes
-      dayMeshes.forEach((mesh) => {
-        mesh.geometry.dispose()
-        if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose())
-        else mesh.material.dispose()
-        scene.remove(mesh)
-      })
-      innerMeshesRef.current.forEach((mesh) => {
-        mesh.geometry.dispose()
-        if (Array.isArray(mesh.material)) mesh.material.forEach((m) => m.dispose())
-        else mesh.material.dispose()
-        scene.remove(mesh)
-      })
-
+      cancelAnimationFrame(frame)
+      cancelAnimationFrame(hoverFrameRef.current)
+      document.removeEventListener('visibilitychange', visibilityChanged)
+      canvas.removeEventListener('webglcontextlost', contextLost)
+      container.removeEventListener('wheel', wheel)
+      observer.disconnect(); resizeObserver.disconnect()
+      ringRef.current = null; compareRef.current = null; cameraRef.current = null; rendererRef.current = null
+      scene.remove(ring, comparison, floor)
+      dayGeo.dispose(); dayMat.dispose(); compareGeo.dispose(); compareMat.dispose()
+      floorGeo.dispose(); floorMat.dispose()
+      disposeLabels(); trees.forEach((tree) => tree.dispose()); atmosphere.dispose()
       renderer.dispose()
+      // React Strict Mode immediately sets this effect up again on the same
+      // canvas in development. Forcing context loss here breaks that remount.
     }
-  }, [webglSupported, soilCover, erosivity, nObs, compareCover, maxErosivity])
+  }, [webglSupported])
 
-  // Update dynamic colors and highlight / selected states without recreating geometries
   useEffect(() => {
-    const meshes = dayMeshesRef.current
-    if (!meshes || meshes.length === 0) return
+    const ring = ringRef.current
+    if (!ring) return
+    const max = Math.max(1e-6, ...erosivity.filter(Number.isFinite))
+    const matrix = new THREE.Matrix4()
+    for (let i = 0; i < DAYS_IN_RING; i++) {
+      const risk = Number.isFinite(erosivity[i]) ? Math.max(0, erosivity[i]) / max : 0
+      ring.setMatrixAt(i, dayMatrix(i, 0.5 + risk * 1.5, matrix))
+    }
+    ring.instanceMatrix.needsUpdate = true
+    ring.computeBoundingSphere()
+  }, [erosivity, webglSupported])
 
-    for (let i = 0; i < meshes.length; i++) {
-      const mesh = meshes[i]
+  useEffect(() => {
+    const ring = ringRef.current
+    if (!ring) return
+    for (let i = 0; i < DAYS_IN_RING; i++) {
       const doy = i + 1
-      const isSelected = doy === selectedDoy
-      const isHovered = doy === hoveredDoy
-      const isHighlighted = highlightSet?.has(doy)
-
-      const mat = mesh.material as THREE.MeshStandardMaterial
-      if (!mat) continue
-
-      if (isSelected) {
-        mat.color.set(COLOR_SELECTED)
-        mat.emissive.set(0x4a3a10)
-      } else if (isHovered) {
-        mat.color.set(COLOR_SELECTED.clone().lerp(COLOR_BARE, 0.4))
-        mat.emissive.set(0x2a2208)
-      } else if (isHighlighted) {
-        mat.color.set(COLOR_SELECTED)
-        mat.emissive.set(0x1a1505)
-      } else {
-        const baseCol = getDayColor(soilCover[i] ?? 0, nObs[i] ?? 0)
-        mat.color.copy(baseCol)
-        mat.emissive.set(0x000000)
-      }
+      const color = doy === selectedDoy ? selected : doy === hoveredDoy ? hovered : highlightSet.has(doy) ? candidate : dayColor(soilCover[i], nObs[i] ?? 0, colorScratch)
+      ring.setColorAt(i, color)
     }
-  }, [soilCover, nObs, selectedDoy, hoveredDoy, highlightSet])
+    if (ring.instanceColor) ring.instanceColor.needsUpdate = true
+  }, [soilCover, nObs, selectedDoy, hoveredDoy, highlightSet, webglSupported])
 
-  // Pointer interactions for Camera Orbit & Day Raycasting
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    isDraggingRef.current = true
-    prevPointerRef.current = { x: e.clientX, y: e.clientY }
-  }, [])
-
-  const getDoyUnderPointer = useCallback(
-    (clientX: number, clientY: number): number | null => {
-      if (!canvasRef.current || !cameraRef.current || !sceneRef.current) return null
-      const rect = canvasRef.current.getBoundingClientRect()
-      const x = ((clientX - rect.left) / rect.width) * 2 - 1
-      const y = -(((clientY - rect.top) / rect.height) * 2 - 1)
-
-      const raycaster = new THREE.Raycaster()
-      raycaster.setFromCamera(new THREE.Vector2(x, y), cameraRef.current)
-
-      const hits = raycaster.intersectObjects(dayMeshesRef.current, false)
-      if (hits.length > 0 && hits[0].object.userData.doy) {
-        return hits[0].object.userData.doy as number
-      }
-      return null
-    },
-    [],
-  )
-
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (isDraggingRef.current) {
-        const dx = e.clientX - prevPointerRef.current.x
-        const dy = e.clientY - prevPointerRef.current.y
-        prevPointerRef.current = { x: e.clientX, y: e.clientY }
-
-        const rotSpeed = 0.007
-        const angles = cameraAngleRef.current
-        angles.theta += dx * rotSpeed
-        // Clamp pitch so ring remains viewable and doesn't flip
-        angles.phi = Math.max(0.25, Math.min(Math.PI / 2.05, angles.phi - dy * rotSpeed))
-        return
-      }
-
-      // Hover Raycasting
-      const doy = getDoyUnderPointer(e.clientX, e.clientY)
-      onHoverDay?.(doy)
-    },
-    [getDoyUnderPointer, onHoverDay],
-  )
-
-  const handlePointerUp = useCallback(
-    (e: React.PointerEvent) => {
-      if (!isDraggingRef.current) return
-      isDraggingRef.current = false
-
-      // If drag distance was very small, treat as click/selection
-      const dist = Math.hypot(
-        e.clientX - prevPointerRef.current.x,
-        e.clientY - prevPointerRef.current.y,
-      )
-      if (dist < 4) {
-        const doy = getDoyUnderPointer(e.clientX, e.clientY)
-        if (doy) onSelectDay?.(doy)
-      }
-    },
-    [getDoyUnderPointer, onSelectDay],
-  )
-
-  const handlePointerLeave = useCallback(() => {
-    isDraggingRef.current = false
-    onHoverDay?.(null)
-  }, [onHoverDay])
-
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    const zoomSpeed = 0.015
-    const angles = cameraAngleRef.current
-    angles.radius = Math.max(14, Math.min(36, angles.radius + e.deltaY * zoomSpeed))
-  }, [])
-
-  const resetCamera = useCallback(() => {
-    cameraAngleRef.current = {
-      theta: Math.PI / 4,
-      phi: Math.PI / 3.4,
-      radius: 24,
+  useEffect(() => {
+    const comparison = compareRef.current
+    if (!comparison) return
+    comparison.count = compareCover?.length === DAYS_IN_RING ? DAYS_IN_RING : 0
+    if (!comparison.count) return
+    for (let i = 0; i < DAYS_IN_RING; i++) {
+      const color = (nObs[i] ?? 0) <= 0 ? unknown : compareCover![i] < 0.3 ? compareBare : compareCovered
+      comparison.setColorAt(i, color)
     }
+    if (comparison.instanceColor) comparison.instanceColor.needsUpdate = true
+  }, [compareCover, nObs, webglSupported])
+
+  const pickDay = useCallback((clientX: number, clientY: number): number | null => {
+    const canvas = canvasRef.current
+    const camera = cameraRef.current
+    const ring = ringRef.current
+    if (!canvas || !camera || !ring) return null
+    const rect = canvas.getBoundingClientRect()
+    if (!rect.width || !rect.height || clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) return null
+    pointerRef.current.set((clientX - rect.left) / rect.width * 2 - 1, -((clientY - rect.top) / rect.height * 2 - 1))
+    camera.updateMatrixWorld()
+    raycasterRef.current.setFromCamera(pointerRef.current, camera)
+    return instanceIdToDoy(raycasterRef.current.intersectObject(ring, false)[0]?.instanceId)
   }, [])
 
-  if (!webglSupported) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8 text-center text-ink-soft">
-        <p className="font-semibold text-risk-high">WebGL is unavailable in this environment.</p>
-        <p className="mt-1 text-sm">Please switch to the 2D View to explore the Year Ring.</p>
-      </div>
-    )
-  }
+  const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    if (event.target !== canvasRef.current) return
+    dragRef.current = { active: true, moved: false, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY }
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }, [])
+  const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current
+    if (drag.active) {
+      if (Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY) > 4) drag.moved = true
+      const dx = event.clientX - drag.x
+      const dy = event.clientY - drag.y
+      drag.x = event.clientX; drag.y = event.clientY
+      if (drag.moved) {
+        anglesRef.current.theta += dx * 0.007
+        anglesRef.current.phi = Math.max(0.25, Math.min(Math.PI / 2.05, anglesRef.current.phi - dy * 0.007))
+      }
+      return
+    }
+    cancelAnimationFrame(hoverFrameRef.current)
+    const x = event.clientX, y = event.clientY
+    hoverFrameRef.current = requestAnimationFrame(() => {
+      const doy = pickDay(x, y)
+      if (doy !== lastHoverRef.current) { lastHoverRef.current = doy; onHoverDay?.(doy) }
+    })
+  }, [pickDay, onHoverDay])
+  const handlePointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current
+    if (!drag.active) return
+    drag.active = false
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    if (!drag.moved) {
+      const doy = pickDay(event.clientX, event.clientY)
+      if (doy) { onSelectDay?.(doy); onActivateDay?.(doy) }
+    }
+  }, [pickDay, onSelectDay, onActivateDay])
+  const handlePointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
+    dragRef.current.active = false
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+  }, [])
 
-  return (
-    <div
-      ref={containerRef}
-      className="relative flex h-[500px] w-full flex-col items-center justify-center overflow-hidden rounded-xl border border-black/10 bg-paper"
-      style={{ touchAction: 'none' }}
-      onPointerDown={handlePointerDown}
-      onPointerMove={handlePointerMove}
-      onPointerUp={handlePointerUp}
-      onPointerLeave={handlePointerLeave}
-      onWheel={handleWheel}
-      role="region"
-      aria-label="3D Year Ring Interactive Calendar"
-    >
-      <canvas ref={canvasRef} className="h-full w-full cursor-grab active:cursor-grabbing" />
-
-      {/* Floating 3D Controls */}
-      <div className="pointer-events-auto absolute bottom-3 right-3 flex items-center gap-2">
-        <button
-          onClick={resetCamera}
-          className="rounded-md border border-black/15 bg-white/90 px-2.5 py-1 text-xs font-medium text-ink shadow-sm backdrop-blur hover:bg-white hover:text-canopy-deep"
-          title="Reset 3D camera to default isometric view"
-          type="button"
-        >
-          Reset Camera
-        </button>
-      </div>
-
-      <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-white/80 px-2 py-1 text-[11px] font-medium text-ink-soft backdrop-blur">
-        Drag to orbit · Scroll to zoom · Click day to inspect
-      </div>
-    </div>
-  )
+  if (!webglSupported) return <div className="flex h-full flex-col items-center justify-center p-8 text-center text-ink-soft"><p className="font-semibold text-risk-high">3D graphics are unavailable in this browser.</p><p className="mt-1 text-sm">Use the 2D Year Ring to continue.</p></div>
+  return <div ref={containerRef} className="relative h-full w-full overflow-hidden rounded-xl border border-black/10 bg-paper" style={{ touchAction: 'none' }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onLostPointerCapture={() => { dragRef.current.active = false }} onPointerLeave={() => { if (!dragRef.current.active && lastHoverRef.current !== null) { lastHoverRef.current = null; onHoverDay?.(null) } }} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { event.preventDefault(); event.stopPropagation(); const doy = pickDay(event.clientX, event.clientY); if (doy) { onSelectDay?.(doy); onActivateDay?.(doy) } }} role="region" aria-label="3D Year Ring Interactive Calendar">
+    <canvas ref={canvasRef} className="block h-full w-full cursor-grab active:cursor-grabbing" />
+    <div className="pointer-events-none absolute left-3 top-3 rounded-md bg-white/85 px-2 py-1 text-[11px] font-medium text-ink-soft backdrop-blur">Drag to orbit · Scroll to zoom · Click day to inspect</div>
+    <button type="button" className="absolute bottom-3 right-3 rounded-md border border-black/15 bg-white/90 px-3 py-1.5 text-xs font-medium text-ink shadow-sm hover:text-canopy-deep" onPointerDown={(event) => event.stopPropagation()} onClick={() => { anglesRef.current = { theta: 0.38, phi: 0.92, radius: 29 } }}>Reset camera</button>
+  </div>
 }
-
-export default YearRing3D

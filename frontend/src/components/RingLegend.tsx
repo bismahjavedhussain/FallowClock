@@ -90,7 +90,7 @@ export const RingLegend: React.FC<RingLegendProps> = ({
           <div>
             <div className="text-xs font-semibold text-risk-high">Erosion Risk (Overlay)</div>
             <div className="text-[11px] leading-tight text-ink-soft">
-              Rain erosivity &Sigma; R &times; C; separate layer from cover
+              Rainfall erosivity R; separate layer from cover
             </div>
           </div>
         </div>
@@ -99,8 +99,8 @@ export const RingLegend: React.FC<RingLegendProps> = ({
       {showDetails && (
         <div className="mt-3.5 border-t border-black/5 pt-2.5 text-[11px] leading-relaxed text-ink-soft">
           <p>
-            <strong className="text-ink">Scientific Rule:</strong> Soil cover is determined strictly by{' '}
-            <code className="font-mono text-ink">soil_cover = max(green_cover, residue_cover)</code>. Green canopy (NDVI) and crop stubble residue (NDTI) provide dual supporting evidence. Rainfall erosivity appears as an independent outer height/bar layer, never as the soil classification itself.
+            <strong className="text-ink">Scientific Rule:</strong> The bundle&rsquo;s{' '}
+            <code className="font-mono text-ink">soil_cover</code> determines bare or covered status. Green canopy and residue are supporting evidence. Missing observations remain unknown. Rainfall erosivity is a separate outer layer.
           </p>
         </div>
       )}
