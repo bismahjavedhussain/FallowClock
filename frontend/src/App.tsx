@@ -155,15 +155,18 @@ export default function App() {
     </nav>
 
     <header className="workspace-intro" id="year">
-      <div><span className="eyebrow">✦ THE LIVING YEAR · {bundle.farm.place}</span><h1>Find the <em>hole</em> in your year.</h1><p>Explore soil cover, rainfall erosivity, and the seasons around one field.</p></div>
-      <div className="workspace-field"><span>{bundle.provenance.is_synthetic ? 'Interactive sample field' : bundle.farm.owner_name.startsWith('TBD') ? 'Observed Story County field' : bundle.farm.owner_name}</span><strong>{bundle.farm.area_ha} ha</strong></div>
+      <div className="overview-copy"><span className="eyebrow">✦ THE LIVING YEAR · {bundle.farm.place}</span><h1>Find the <em>hole</em> in your year.</h1><p>Explore soil cover, rainfall erosivity, and the seasons around one field.</p><small>{bundle.provenance.is_synthetic ? 'Interactive sample field' : bundle.farm.owner_name.startsWith('TBD') ? 'Observed Story County field' : bundle.farm.owner_name} · {bundle.farm.area_ha} ha</small></div>
+      <div className="field-summary overview-summary" aria-label="Field overview">
+        <div><span className="eyebrow">{bundle.provenance.is_synthetic ? 'From this sample' : 'From this field'}</span><strong>{knownBareDays(current.soil_cover, clim.n_obs_per_doy)} <small>days</small></strong><p>with {bundle.provenance.is_synthetic ? 'simulated' : 'observed'} bare soil in the annual cycle</p></div>
+        <div><span className="eyebrow">Erosivity overlap</span><strong>{Math.round((bundle.gaps[0]?.share_of_annual_r ?? 0) * 100)}<small>%</small></strong><p>of annual erosivity overlaps the largest bare gap</p></div>
+      </div>
     </header>
 
     <main className="workspace-main">
       <div className="main-grid">
         <section className="ring-column" aria-label="Interactive agricultural calendar">
-          <div className="hero-world" data-season={seasonAtDoy(selectedDoy)} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); setPlacementMessage('Drop the packet onto a day on the wheel, or use the suggested date button.') }}>
-            <Suspense fallback={null}><SeasonalWorld doy={selectedDoy} reducedMotion={reducedMotion} active={mode === '2D'} /></Suspense>
+          <div className="hero-world" data-season={seasonAtDoy(selectedDoy)} data-mode={mode} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); setPlacementMessage('Drop the packet onto a day on the wheel, or use the suggested date button.') }}>
+            <Suspense fallback={null}><SeasonalWorld doy={selectedDoy} /></Suspense>
             <YearRing initialMode="3D" showLegend={false} soilCover={ringCover} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} frostProb={clim.frost_prob} greenCover={clim.green_cover} residueCover={clim.residue_cover} compareCover={selected ? current.soil_cover : accepted.length ? baselineCover : undefined} highlightDoys={plantingDoys} selectedDoy={selectedDoy} onHoverDay={setHoveredDoy} onSelectDay={setSelectedDoy} onActivateDay={(day) => draggingSpeciesId && placeCrop(day)} onModeChange={setMode} reducedMotion={reducedMotion} synthetic={bundle.provenance.is_synthetic} />
           </div>
           <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
@@ -171,22 +174,19 @@ export default function App() {
         </section>
 
         <aside className="planner-column" id="planner">
-          <div className="field-summary"><span className="eyebrow">{bundle.provenance.is_synthetic ? 'From this sample' : 'From this field'}</span><strong>{knownBareDays(current.soil_cover, clim.n_obs_per_doy)} <small>days</small></strong><p>with {bundle.provenance.is_synthetic ? 'simulated' : 'observed'} bare soil in the annual cycle</p><div className="summary-divider"/><strong>{Math.round((bundle.gaps[0]?.share_of_annual_r ?? 0) * 100)}<small>%</small></strong><p>of annual erosivity overlaps the largest bare gap</p></div>
           <details className="sidebar-section sidebar-day" open><summary>Selected day & climate</summary><AtmosphereReadout doy={selectedDoy} climate={clim} synthetic={bundle.provenance.is_synthetic} /><p className="ring-caption">{hoveredDoy ? `DOY ${hoveredDoy} · ${clim.n_obs_per_doy[hoveredDoy - 1] > 0 ? `soil cover ${(ringCover[hoveredDoy - 1] * 100).toFixed(0)}%` : 'soil cover unknown'} · ${clim.n_obs_per_doy[hoveredDoy - 1]} ${bundle.provenance.is_synthetic ? 'simulated' : 'observations'}` : bundle.provenance.is_synthetic ? 'Interactive synthetic sample. No satellite cover observations are claimed.' : 'Hover or select a day to read the field. The illustrated season is decorative.'}</p></details>
           <CropPlanner species={bundle.species} fits={ranked} picked={draggingSpeciesId} placed={placedFills} onPick={setDraggingSpecies} onPlace={() => pickedFit && placeCrop(pickedFit.seedDoy)} onRemove={removePlacedFill} onReset={resetPlacedFills} baselineBare={baselineBare} proposedBare={proposedBare} baselineExposure={baselineExposure} proposedExposure={proposedExposure} />
           <details className="sidebar-section"><summary>Rotation paths</summary>
 <section className="rotation-card"><div className="card-title"><span className="eyebrow">Compare futures</span><h2>Rotation paths</h2></div><div className="rotation-list">{bundle.rotations.map((r) => <button type="button" key={r.id} onClick={() => selectRotation(r.is_current ? null : r.id)} aria-pressed={(selected?.id ?? current.id) === r.id} className="rotation-option"><span className="rotation-icon" aria-hidden="true">{r.is_current ? '◌' : '✿'}</span><span className="rotation-copy"><strong>{r.label}</strong><small>{r.bare_days} bare days · {r.added_seed_cost_usd_ha > 0 ? `+$${r.added_seed_cost_usd_ha}/ha seed` : 'current practice'}{r.n_credit_kg_ha > 0 ? ` · ${r.n_credit_kg_ha} kg N/ha credit` : ''}</small></span><span className="rotation-delta">{r.delta_vs_current_pct === 0 ? 'Baseline' : `${r.delta_vs_current_pct.toFixed(0)}% soil loss`}</span></button>)}</div></section>
           </details>
-          <details className="sidebar-section" open><summary>Calendar legend & soil information</summary><RingLegend compact showDetails /></details>
-          <details className="sidebar-section" id="evidence"><summary>Field notes & data sources</summary>
-<section className="field-notes"><div className="section-heading"><span className="section-number">02 / FIELD NOTES</span><h2>Beauty, with evidence beneath it.</h2><p>Planting ideas are proposals. We keep observations, modelled cover, and uncertainty visible.</p></div><div className="notes-grid">
+        </aside>
+      </div>
+<section className="field-notes" id="evidence"><div className="section-heading"><span className="section-number">02 / FIELD NOTES</span><h2>Beauty, with evidence beneath it.</h2><p>Planting ideas are proposals. We keep observations, modelled cover, and uncertainty visible.</p></div><div className="evidence-legend"><RingLegend compact showDetails /></div><div className="notes-grid">
         <article className="notes-card"><div className="notes-card-title"><span className="notes-ornament">❦</span><div><span className="eyebrow">Crop fit</span><h3>What fits the longest gap</h3></div></div><ol className="fit-list">{ranked.slice(0, 6).map((fit, index) => <li key={fit.speciesId} className={fit.feasible ? '' : 'unavailable'}><span className="fit-number">{String(index + 1).padStart(2, '0')}</span><span><strong>{fit.speciesName}</strong><small>{fit.feasible ? `${fit.curveSource} cover · suggested seed day ${fit.seedDoy}` : fit.reason}</small></span><span className="fit-benefit">{fit.feasible ? `−${fit.pctReduction.toFixed(0)}%` : '—'}</span></li>)}</ol><p className="notes-footnote">Percentages estimate erosion exposure reduction within the largest gap, using the bundle and existing crop fit model.</p></article>
         <article className="notes-card"><div className="notes-card-title"><span className="notes-ornament">✧</span><div><span className="eyebrow">Uncertainty ledger</span><h3>What we do not know</h3></div></div><ul className="uncertainty-list">{bundle.uncertainty.map((u, i) => <li key={i}><div><span className={`uncertainty-level level-${u.level}`}>{u.level}</span><code>{u.field}</code></div><p>{u.reason}</p><small>{u.affects}</small></li>)}</ul></article>
       </div><div className="provenance-strip"><span>✦ &nbsp; DATA SOURCES</span><div>{bundle.provenance.sources.map((source, i) => <span key={i}>{source.name}</span>)}</div><small>Years: {bundle.provenance.years_used.join(', ') || 'unspecified'}</small></div></section>
-          </details>
-        </aside>
-      </div>
 
     </main>
+    <footer className="site-footer"><span className="footer-mark" aria-hidden="true">✺</span><div><strong>Fallow Clock</strong><small>A living view of the agricultural year.</small></div><p>Seasonal artwork illustrates time and atmosphere. Field values and planning estimates come from the loaded data bundle.</p><nav aria-label="Footer navigation"><a href="#year">The year</a><a href="#planner">Crop studio</a><a href="#evidence">Field notes</a><a href="#top">Back to top ↑</a></nav></footer>
   </div>
 }

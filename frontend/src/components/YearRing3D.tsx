@@ -121,7 +121,7 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
     const canvas = canvasRef.current
     let renderer: THREE.WebGLRenderer
     try {
-      renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
+      renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true, powerPreference: 'high-performance' })
     } catch {
       setWebglSupported(false)
       fallbackRef.current?.()
@@ -133,7 +133,7 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
     renderer.shadowMap.enabled = true
     renderer.shadowMap.type = THREE.PCFSoftShadowMap
     const scene = new THREE.Scene()
-    scene.background = new THREE.Color('#f9eee0')
+    scene.background = null
     const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 90)
     cameraRef.current = camera
     const ambient = new THREE.AmbientLight('#ffffff', 1.2)
@@ -216,17 +216,17 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
 
     const current = seasonWeights(seasonRef.current ?? 274)
     const clock = new THREE.Clock()
-    const skyWarm = new THREE.Color('#f9eee0')
-    const skyCool = new THREE.Color('#e8f2fa')
     const sunWarm = new THREE.Color('#fff1d0')
     const sunCool = new THREE.Color('#dbe8ff')
     let visible = true
     let frame = 0
     let running = false
-    const render = () => {
+    let lastFrame = 0
+    const render = (now: number) => {
       if (!visible || document.hidden) { running = false; return }
-      running = true
       frame = requestAnimationFrame(render)
+      if (now - lastFrame < (dragRef.current.active ? 16 : 33)) return
+      lastFrame = now
       updateCamera()
       const target = seasonWeights(seasonRef.current ?? 274)
       const easing = motionRef.current ? 1 : 0.025
@@ -234,11 +234,10 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
       const time = clock.getElapsedTime()
       trees.forEach((tree) => tree.update(time, current, motionRef.current))
       atmosphere.update(time, current, motionRef.current)
-      ;(scene.background as THREE.Color).copy(skyWarm).lerp(skyCool, current.winter)
       sun.color.copy(sunWarm).lerp(sunCool, current.winter)
       renderer.render(scene, camera)
     }
-    const start = () => { if (!running && visible && !document.hidden) render() }
+    const start = () => { if (!running && visible && !document.hidden) { running = true; frame = requestAnimationFrame(render) } }
     const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; if (visible) start() })
     observer.observe(container)
     const visibilityChanged = () => { if (!document.hidden) start() }

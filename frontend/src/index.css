@@ -319,3 +319,138 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   .workspace-main { padding-bottom: 0; }
   .planner-column { height: calc(100dvh - 196px); }
 }
+
+/* Painted forest atmosphere: one compressed backdrop and composited weather. */
+.site-shell { background: radial-gradient(circle at 48% 10%, #d6f0dd 0, #edf4e9 39%, #e8f0e4 100%); }
+.site-shell::before { background: radial-gradient(circle at 20% 0, #fff6d67a, transparent 35%); }
+.topbar { background: linear-gradient(90deg, #093b37, #0f5148 58%, #174b3f); border-bottom-color: #3b8270; box-shadow: 0 5px 25px #062c2d22; }
+.brand, .top-links a { color: #f1f6e8; }
+.brand small { color: #b9e1c4; }
+.brand-seal { color: #fff1c6; background: #24695a; border-color: #b7d9bd; box-shadow: 0 0 0 3px #ffffff16, 0 5px 15px #001b1b70; }
+.top-links a:hover { border-color: #e8c889; color: #fff7d9; }
+.topbar .audio-controls { background: #f6f8eee8; border-color: #8cbe9d; }
+.workspace-intro { color: #eff8e9; background: linear-gradient(115deg, #0f5448, #1b6e5e 50%, #2a7a69); border-bottom-color: #76a998; box-shadow: inset 0 1px #ffffff33; }
+.workspace-intro h1, .workspace-field strong { color: #fff7de; }
+.workspace-intro h1 em { color: #f0cf87; }
+.workspace-intro .eyebrow, .workspace-intro p, .workspace-field { color: #d2eadc; }
+.workspace-main { background: linear-gradient(180deg, #d3eadc55, transparent 70%); }
+.hero-world { background: #0d4b43; border: 1px solid #73a99a; box-shadow: 0 18px 45px #12473f40, inset 0 0 0 1px #ffffff40; }
+.seasonal-world { background: #0b4c45 url('/scene/emerald-clearing.webp') center 48% / cover no-repeat; }
+.seasonal-world::after { content: ''; position: absolute; inset: 0; background: linear-gradient(90deg, #052c2a45, transparent 25%, transparent 74%, #05332944), linear-gradient(180deg, #0a473b1f, transparent 46%, #052b2952); pointer-events: none; }
+.season-layer { mix-blend-mode: soft-light; }
+.layer-spring { background: linear-gradient(180deg, #dff9df24, #a9e5bc25); }
+.layer-summer { background: linear-gradient(180deg, #c8f7cd12, #3aa57732); }
+.layer-autumn { background: linear-gradient(180deg, #b55e3440, #f7b56a38); }
+.layer-winter { background: linear-gradient(180deg, #c8deef69, #d2e4ed62); }
+.scenic-sun, .scenic-cloud, .scenic-hills { display: none; }
+.forest-light { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.forest-light::before, .forest-light::after { content: ''; position: absolute; top: -20%; height: 138%; background: linear-gradient(90deg, transparent, #f7f8c646 50%, transparent); filter: blur(8px); transform: rotate(22deg); transform-origin: top center; animation: forest-light-breathe 9s ease-in-out infinite alternate; }
+.forest-light::before { left: 15%; width: 10%; }
+.forest-light::after { left: 35%; width: 5%; opacity: .55; animation-delay: -4s; }
+.forest-haze { position: absolute; inset: 15% 0 0; background: radial-gradient(ellipse at 50% 64%, #c3fff64d, transparent 55%), linear-gradient(0deg, #0b686a34, transparent 42%); opacity: .75; pointer-events: none; animation: haze-drift 15s ease-in-out infinite alternate; }
+.forest-rain { position: absolute; inset: -240px 0 0; pointer-events: none; background: url('/scene/rain.svg') repeat; background-size: 180px 240px; opacity: .35; animation: forest-rain-fall 2.8s linear infinite; }
+.season-winter .forest-rain { opacity: .12; }
+.season-summer .forest-rain { opacity: .24; }
+.season-autumn .forest-rain { opacity: .42; }
+.forest-motes { position: absolute; inset: 0; pointer-events: none; }
+.forest-motes span { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #e5ffc5; box-shadow: 0 0 8px 3px #d2faaa81; opacity: .8; animation: mote-drift 6s ease-in-out infinite alternate; }
+.forest-motes span:nth-child(1) { left: 6%; top: 72%; animation-delay: -1s; }
+.forest-motes span:nth-child(2) { left: 14%; top: 40%; animation-delay: -5s; }
+.forest-motes span:nth-child(3) { left: 23%; top: 84%; animation-delay: -2s; }
+.forest-motes span:nth-child(4) { left: 31%; top: 28%; animation-delay: -3s; }
+.forest-motes span:nth-child(5) { left: 41%; top: 71%; animation-delay: -4s; }
+.forest-motes span:nth-child(6) { left: 49%; top: 17%; animation-delay: -1.5s; }
+.forest-motes span:nth-child(7) { left: 56%; top: 64%; animation-delay: -4.5s; }
+.forest-motes span:nth-child(8) { left: 65%; top: 38%; animation-delay: -2.5s; }
+.forest-motes span:nth-child(9) { left: 73%; top: 80%; animation-delay: -1.8s; }
+.forest-motes span:nth-child(10) { left: 82%; top: 49%; animation-delay: -3.5s; }
+.forest-motes span:nth-child(11) { left: 91%; top: 76%; animation-delay: -.7s; }
+.forest-motes span:nth-child(12) { left: 96%; top: 21%; animation-delay: -5.5s; }
+@keyframes forest-rain-fall { to { transform: translateY(240px); } }
+@keyframes forest-light-breathe { to { opacity: .38; translate: 10px 0; } }
+@keyframes haze-drift { to { opacity: .48; translate: 18px 0; } }
+@keyframes mote-drift { to { opacity: .18; transform: translate3d(9px, -13px, 0); } }
+.hero-world[data-mode="2D"] .year-ring-stage-2d { border-radius: 28px; background: #f6f8ebd6; box-shadow: inset 0 0 0 1px #ffffffb0, 0 15px 38px #0a3b3547; backdrop-filter: blur(4px); }
+.year-ring-stage-3d > div { background: transparent; border-color: #ffffff4d; }
+.hero-world .year-ring-controls { background: #f8f8e9ec; border-color: #c8dfcc; box-shadow: 0 4px 18px #062d2d35; }
+.hero-world .year-ring-tooltip { background: #fbfff0ed; border-color: #a5cdb4; box-shadow: 0 12px 32px #073b3657; }
+.time-lever { background: #f9faed; border-color: #a8c7ad; box-shadow: 0 8px 25px #1a625721; }
+.time-lever input[type="range"] { accent-color: #11715e; }
+.season-jumps button[aria-pressed="true"] { background: #cde9c6; color: #175b4b; }
+.field-summary { background: linear-gradient(130deg, #0e5045, #1b7661); box-shadow: 0 12px 30px #0d51442e; }
+.crop-planner, .sidebar-section { background: #fbfcf3; border-color: #b8cdb9; }
+.seed-packet { border-color: #c9ceaa; box-shadow: 0 3px 0 #b2c29e; }
+.seed-packet:hover, .seed-packet.selected { border-color: #137563; box-shadow: 0 5px 0 #78a68b, 0 8px 18px #1d6b5730; }
+.rotation-option[aria-pressed="true"] { background: #d9efdf; border-color: #4b9a79; }
+.sidebar-section > summary { color: #175b4d; }
+@media (prefers-reduced-motion: reduce) {
+  .forest-rain, .forest-light::before, .forest-light::after, .forest-haze, .forest-motes span { animation: none !important; }
+}
+.seasonal-world.season-autumn { filter: sepia(.16) saturate(.9) hue-rotate(-10deg); }
+.seasonal-world.season-winter { filter: saturate(.36) hue-rotate(22deg) brightness(1.08); }
+.seasonal-world.season-winter::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, #e4f5ff39, #d7e9f076 75%, #eff8fd62); pointer-events: none; }
+.seasonal-world.season-summer .forest-motes span { background: #faffae; box-shadow: 0 0 10px 4px #f4ff997f; }
+.seasonal-world.season-winter .forest-motes span { background: #f4fbff; box-shadow: 0 0 7px 3px #f3fbff8a; }
+.season-spring .forest-rain { opacity: .52; }
+.season-autumn .forest-rain { opacity: .62; }
+@keyframes exhibit-arrive { from { opacity: .55; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.hero-world, .field-summary { animation: exhibit-arrive .65s cubic-bezier(.2,.75,.25,1) both; }
+.field-summary { animation-delay: .08s; }
+@media (prefers-reduced-motion: reduce) { .hero-world, .field-summary { animation: none; } }
+
+/* Field overview sits above the visual workspace. */
+.workspace-intro { padding-block: 14px; align-items: center; }
+.overview-copy { min-width: 0; }
+.overview-copy small { display: block; margin-top: 6px; color: #d5ecda; font-size: 11px; }
+.workspace-intro .overview-summary { width: min(520px, 43%); min-height: 0; flex: none; display: grid; grid-template-columns: 1fr 1fr; gap: 18px; padding: 12px 18px; border: 1px solid #ffffff37; border-radius: 15px; background: #053f39a8; box-shadow: 0 8px 20px #06392d3b; }
+.overview-summary::after { display: none; }
+.overview-summary > div + div { border-left: 1px solid #ffffff45; padding-left: 18px; }
+.overview-summary strong { margin: 3px 0 1px; font-size: 28px; line-height: 1; }
+.overview-summary strong small { font-size: 14px; }
+.overview-summary p { margin: 0; font-size: 10px; line-height: 1.3; }
+@media (min-width: 851px) { .planner-column { height: calc(100dvh - 228px); min-height: 350px; } }
+
+/* Day inspection becomes a slim vertical readout at the left of the wheel. */
+.hero-world .year-ring-tooltip { top: 62px; bottom: auto; left: 15px; width: min(214px, 26%); max-width: none; padding: 11px; transform: none; }
+.hero-world .year-ring-tooltip > div:first-child { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.hero-world .year-ring-tooltip .mt-2\.5 { display: grid; grid-template-columns: 1fr; gap: 0; margin-top: 6px; }
+.hero-world .year-ring-tooltip .mt-2\.5 > div { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 1px solid #acc9b36b; }
+.hero-world .year-ring-tooltip .mt-2\.5 > div:last-child { border-bottom: 0; }
+.hero-world .year-ring-tooltip .mt-2\.5 > div > div:first-child { max-width: 105px; line-height: 1.2; }
+.hero-world .year-ring-tooltip .mt-2\.5 > div > div:last-child { text-align: right; }
+
+/* Keep the forest visible through the 2D calendar. */
+.hero-world[data-mode="2D"] .year-ring-stage-2d { background: #eaf8e915; backdrop-filter: none; box-shadow: inset 0 0 0 1px #ffffff70; }
+.hero-world[data-mode="2D"] .year-ring-stage-2d svg { filter: drop-shadow(0 9px 15px #103e3845); }
+
+/* Legend and uncertainty are part of the page below the visualization. */
+.field-notes { max-width: none; margin: 36px 0 48px; padding: 0; }
+.field-notes .section-heading { max-width: none; margin: 0 0 18px; padding: 0 2px; text-align: left; }
+.field-notes .section-heading h2 { font-size: clamp(28px, 3vw, 40px); }
+.field-notes .section-heading p { max-width: 720px; margin: 0; }
+.evidence-legend { margin-bottom: 18px; }
+.evidence-legend > aside { border-color: #b8cdb9; background: #fbfcf3; box-shadow: 0 8px 24px #0d51441c; }
+.field-notes .notes-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.field-notes .notes-card { background: #fbfcf3; border-color: #b8cdb9; }
+.site-footer { flex-wrap: wrap; gap: 14px 22px; padding: 28px clamp(18px, 3vw, 54px); background: linear-gradient(90deg, #073e39, #145548); }
+.site-footer p { flex: 1 1 260px; max-width: 480px; margin-left: auto; }
+.site-footer nav { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 22px; }
+.site-footer nav a { color: #e8f6dc; text-decoration: none; font-size: 11px; }
+.site-footer nav a:hover { text-decoration: underline; }
+@media (max-width: 850px) {
+  .workspace-intro { align-items: stretch; }
+  .workspace-intro .overview-summary { width: min(420px, 47%); }
+  .field-notes .notes-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 600px) {
+  .workspace-intro { flex-direction: column; gap: 10px; }
+  .workspace-intro .overview-summary { width: 100%; }
+  .overview-summary strong { font-size: 24px; }
+  .hero-world .year-ring-tooltip { position: relative; top: auto; bottom: auto; left: auto; width: 100%; padding: 9px 11px; }
+  .hero-world .year-ring-tooltip > div:first-child { flex-direction: row; align-items: center; }
+  .hero-world .year-ring-tooltip .mt-2\.5 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; }
+  .hero-world .year-ring-tooltip .mt-2\.5 > div { display: block; padding: 4px 0; }
+  .hero-world .year-ring-tooltip .mt-2\.5 > div > div:last-child { text-align: left; }
+  .field-notes { margin: 24px 0 34px; }
+  .site-footer nav { width: 100%; }
+}

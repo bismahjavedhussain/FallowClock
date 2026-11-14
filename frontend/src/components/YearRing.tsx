@@ -601,15 +601,16 @@ export default function YearRing({
             </g>
 
             {/* 12 Month Labels */}
-            <g className="fill-ink-soft" fontSize={size * 0.021} fontWeight={600}>
+            <g fontSize={size * 0.021} fontWeight={700}>
               {MONTHS.map((m) => {
                 const midDoy = m.startDoy + Math.floor(m.days / 2)
                 const a = doyToAngle(midDoy)
-                const [x, y] = polar(rRiskMax + size * 0.045, a)
+                const [x, y] = polar(rRiskMax + size * 0.014, a)
                 return (
-                  <text key={m.name} x={x} y={y} textAnchor="middle" dominantBaseline="middle">
-                    {m.name}
-                  </text>
+                  <g key={m.name} aria-label={`${m.name} month`}>
+                    <rect x={x - size * 0.026} y={y - size * 0.017} width={size * 0.052} height={size * 0.034} rx={size * 0.008} fill="#f7fff0" fillOpacity={0.9} stroke="#83ad92" strokeOpacity={0.78} strokeWidth={1} />
+                    <text x={x} y={y} fill="#234d3e" textAnchor="middle" dominantBaseline="middle">{m.name}</text>
+                  </g>
                 )
               })}
             </g>
@@ -671,6 +672,7 @@ export default function YearRing({
 
             {/* Centre Readout */}
             <g textAnchor="middle" pointerEvents="none">
+              <circle cx={cx} cy={cy} r={rCoverInner - size * 0.008} fill="#f8fff0" fillOpacity={0.78} stroke="#dcebd7" strokeOpacity={0.8} />
               <text
                 x={cx}
                 y={cy - size * 0.055}
