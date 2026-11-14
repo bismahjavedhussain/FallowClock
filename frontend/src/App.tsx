@@ -1,87 +1,41 @@
-/** Seasonal application shell. Scientific values always come from the bundle. */
+/** Fallow Clock shell. U2 owns this file. Every scientific value comes from the bundle, via lib/metrics. */
 
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import YearRing from './components/YearRing'
-import RingLegend from './components/RingLegend'
+import YearRing, { doyToDate } from './components/YearRing'
 import TimeLever from './components/TimeLever'
 import CropPlanner from './components/CropPlanner'
+import PhaseToggle from './components/PhaseToggle'
+import RotationCompare from './components/RotationCompare'
+import FieldNotes from './components/FieldNotes'
+import ErrorBoundary from './components/ErrorBoundary'
 import AudioAtmosphere from './components/seasonal/AudioAtmosphere'
 import AtmosphereReadout from './components/seasonal/AtmosphereReadout'
-import { PRE_GAP_SEEDING_DAYS, RUSLE_B_DEFAULT, candidateSeedDoys, rankSpeciesForGap } from './lib/cropFit'
-import { placeDecision, proposalPreview } from './lib/proposal'
-import type { ClimatologySlice, Gap, Species } from './lib/cropFit'
-import { useStore } from './store'
+import { BARE_THRESHOLD, PRE_GAP_SEEDING_DAYS, candidateSeedDoys, rankSpeciesForGap, spliceRotationCover, type FitResult } from './lib/cropFit'
+import { FALLBACK_PATH, FARMS, buildFieldModel, loadBundle, type Bundle } from './lib/bundle'
+import { defaultPhaseKey, evidenceTier, fieldFacts, rotationFillCurves, scoreCover, tierLabel, usableFit, type CoverScore } from './lib/metrics'
+import { placeDecision } from './lib/proposal'
+import { findingSentence, personaFor } from './content/story'
+import { isWebGLAvailable } from './lib/webgl'
 import { seasonAtDoy } from './lib/seasons'
-import { doyToDate } from './components/YearRing'
+import { useStore } from './store'
 
 const SeasonalWorld = lazy(() => import('./components/seasonal/SeasonalWorld'))
 
-interface Rotation {
-  id: string
-  label: string
-  is_current: boolean
-  soil_cover: number[]
-  bare_days: number
-  /** Bare days in each rotation phase, ordered as observed_rotation.phase_labels. */
-  bare_days_by_phase?: number[] | null
-  exposed_r: number
-  delta_vs_current_pct: number
-  added_seed_cost_usd_ha: number
-  n_credit_kg_ha: number
+/** Phones, reduced motion and no-WebGL start in 2D: the 3D ring is ~150 KB gzipped. */
+function pickInitialMode(): '2D' | '3D' {
+  const small = window.matchMedia('(max-width: 700px)').matches
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  return small || reduced || !isWebGLAvailable() ? '2D' : '3D'
 }
-
-interface Bundle {
-  farm: { owner_name: string; place: string; area_ha: number }
-  provenance: { is_synthetic: boolean; years_used: number[]; sources: { name: string }[] }
-  climatology: {
-    soil_cover: number[]
-    green_cover: number[]
-    residue_cover: number[]
-    n_obs_per_doy: number[]
-    erosivity_r: number[]
-    erosivity_peak_doy: number
-    gdd_base4: number[]
-    gdd_base10: number[]
-    frost_prob: number[]
-    heat_stress_prob?: number[]
-    soil_moisture: number[]
-    /** One cover curve per rotation phase. soil_cover is their mean. */
-    phase_covers?: number[][] | null
-  }
-  observed_rotation?: {
-    inferred_label: string
-    phase_labels?: string[] | null
-    years: { harvest_doy?: number | null }[]
-  }
-  gaps: Gap[]
-  species: Species[]
-  rotations: Rotation[]
-  crop_curves: Record<string, { green_cover: number[]; n_fields: number; detection: string }>
-  uncertainty: { field: string; level: string; reason: string; affects: string }[]
-}
-
-/**
- * Both observed fields are selectable. Showing only one wastes the most
- * useful thing the tool does: run the same model on two real fields in the
- * same state and get opposite answers. Story County needs a cover crop.
- * Monona County is already conservation tillage and the honest answer there
- * is "nothing to do" -- which is worth more than a recommendation we made up.
- */
-const FARMS = [
-  { id: 'story-county-ia', label: 'Story County', url: '/bundles/farm_story-county-ia.json' },
-  { id: 'monona-county-ia', label: 'Monona County', url: '/bundles/farm_monona-county-ia.json' },
-] as const
-
-/** Only reached if both observed bundles fail to load; carries a red banner. */
-const FALLBACK_URL = '/bundles/farm_synthetic.json'
 
 export default function App() {
-  const [bundle, setBundle] = useState<Bundle | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const { selectedRotationId, selectRotation, hoveredDoy, setHoveredDoy, selectedDoy, setSelectedDoy, draggingSpeciesId, setDraggingSpecies, placedFills, addPlacedFill, removePlacedFill, resetPlacedFills, reducedMotion, setReducedMotion } = useStore()
-  const [mode, setMode] = useState<'2D' | '3D'>('3D')
+  const bundle = useStore((s) => s.bundle)
+  const bundleError = useStore((s) => s.bundleError)
+  const setBundle = useStore((s) => s.setBundle)
+  const setBundleError = useStore((s) => s.setBundleError)
+  const setReducedMotion = useStore((s) => s.setReducedMotion)
   const [farmId, setFarmId] = useState<string>(FARMS[0].id)
-  const [placementMessage, setPlacementMessage] = useState<string | null>(null)
+  const [skipped, setSkipped] = useState<string[]>([])
 
   useEffect(() => {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)')
@@ -92,185 +46,214 @@ export default function App() {
   }, [setReducedMotion])
 
   useEffect(() => {
-    let cancelled = false
-    const load = async () => {
-      const chosen = FARMS.find((f) => f.id === farmId) ?? FARMS[0]
-      for (const url of [chosen.url, FALLBACK_URL]) {
-        try {
-          const r = await fetch(url)
-          if (r.ok) {
-            const next = await r.json()
-            if (!cancelled) {
-              setBundle(next)
-              setError(null)
-            }
-            return
-          }
-        } catch {
-          // try the fallback
-        }
-      }
-      if (!cancelled) setError(`Could not load ${chosen.label}. Tried: ${chosen.url}`)
-    }
-    void load()
-    return () => {
-      cancelled = true
-    }
-  }, [farmId])
+    let alive = true
+    const chosen = FARMS.find((f) => f.id === farmId) ?? FARMS[0]
+    loadBundle([chosen.path, FALLBACK_PATH])
+      .then((loaded) => {
+        if (!alive) return
+        setSkipped(loaded.skipped)
+        setBundle(loaded.bundle)
+      })
+      .catch((error: unknown) => {
+        if (alive) setBundleError(error instanceof Error ? error.message : String(error))
+      })
+    return () => { alive = false }
+  }, [farmId, setBundle, setBundleError])
 
-  const clim = bundle?.climatology
-  const current = bundle?.rotations.find((r) => r.is_current)
-  const selected =
-    bundle?.rotations.find((r) => r.id === selectedRotationId) ?? null
-
-  // Nothing can be drilled into a field that still has a crop standing on
-  // it. The backend already gates its own fit on the observed harvest; the
-  // client-side fit has to use the same gate or the UI recommends seeding
-  // cereal rye on 15 Aug, six weeks before this field's 29 Sep harvest.
-  const earliestSeedDoy = useMemo(() => {
-    const harvests = (bundle?.observed_rotation?.years ?? [])
-      .map((y) => y.harvest_doy)
-      .filter((d): d is number => typeof d === 'number')
-      .sort((a, b) => a - b)
-    return harvests.length ? harvests[Math.floor(harvests.length / 2)] : undefined
-  }, [bundle])
-
-  const phaseLabels = bundle?.observed_rotation?.phase_labels ?? null
-  const phaseCovers = bundle?.climatology?.phase_covers ?? null
-
-  const slice: ClimatologySlice | null = useMemo(
-    () =>
-      clim
-        ? {
-            gddBase4: clim.gdd_base4,
-            gddBase10: clim.gdd_base10,
-            frostProb: clim.frost_prob,
-            soilMoisture: clim.soil_moisture,
-            erosivityR: clim.erosivity_r,
-            soilCover: clim.soil_cover,
-          }
-        : null,
-    [clim],
-  )
-
-  const ranked = useMemo(() => {
-    if (!bundle || !slice || bundle.gaps.length === 0) return []
-    const observed: Record<string, number[]> = {}
-    for (const [k, v] of Object.entries(bundle.crop_curves)) observed[k] = v.green_cover
-    return rankSpeciesForGap(bundle.species, bundle.gaps[0], slice, observed, RUSLE_B_DEFAULT, earliestSeedDoy)
-  }, [bundle, slice, earliestSeedDoy])
-
-  const fitById = useMemo(() => new Map(ranked.map((fit) => [fit.speciesId, fit])), [ranked])
-  const pickedFit = draggingSpeciesId ? fitById.get(draggingSpeciesId) : undefined
-  const plantingDoys = useMemo(() => pickedFit?.feasible && bundle?.gaps[0] && bundle.species.find((s) => s.id === pickedFit.speciesId)
-    ? candidateSeedDoys(bundle.species.find((s) => s.id === pickedFit.speciesId)!, bundle.gaps[0], PRE_GAP_SEEDING_DAYS, earliestSeedDoy) : [], [pickedFit, bundle, earliestSeedDoy])
-
-  if (error) {
-    return (
-      <div className="state-screen"><div className="state-panel"><span aria-hidden="true">✺</span><h1>The field journal could not open.</h1><p>{error}</p><p>Run <code>python scripts/make_fixture.py</code> in backend/ first.</p></div>
-      </div>
-    )
+  if (bundleError) {
+    return <div className="state-screen"><div className="state-panel"><span aria-hidden="true">✺</span><h1>The field journal could not open.</h1><p>{bundleError}</p><p>Run <code>python scripts/make_fixture.py</code> in backend/ first.</p></div></div>
   }
-
-  if (!bundle || !clim || !current) {
+  if (!bundle) {
     return <div className="state-screen"><div className="state-panel" role="status"><span aria-hidden="true">✺</span><h1>Gathering the seasons…</h1><p>Opening the field journal.</p></div></div>
   }
+  return <Workspace bundle={bundle} skipped={skipped} farmId={farmId} onSelectFarm={setFarmId} />
+}
 
-  // The headline must be the bundle's phase-averaged figure, NOT a count
-  // taken off the mean cover curve. Thresholding a mean is not the mean of
-  // the thresholds: on this field that reads 110 instead of 104, and on the
-  // Monona field it reads 0 for a field that is bare 14 days after corn.
-  const phaseSplit =
-    current.bare_days_by_phase && phaseLabels &&
-    current.bare_days_by_phase.length === phaseLabels.length
-      ? current.bare_days_by_phase
-          .map((n, i) => `${n} after ${phaseLabels[i]}`)
-          .join(', ')
-      : null
+function Workspace({ bundle, skipped, farmId, onSelectFarm }: {
+  bundle: Bundle
+  skipped: string[]
+  farmId: string
+  onSelectFarm: (id: string) => void
+}) {
+  const field = useMemo(() => buildFieldModel(bundle), [bundle])
+  const facts = useMemo(() => fieldFacts(field), [field])
+  const finding = useMemo(() => findingSentence(bundle), [bundle])
+  const persona = personaFor(bundle)
+  const synthetic = bundle.provenance.is_synthetic ?? false
+  const clim = bundle.climatology
+  const {
+    selectedRotationId, selectRotation, hoveredDoy, setHoveredDoy, selectedDoy, setSelectedDoy,
+    draggingSpeciesId, setDraggingSpecies, placedFills, addPlacedFill, removePlacedFill, resetPlacedFills,
+    reducedMotion, rusleB, phaseKey, setPhaseKey,
+  } = useStore()
+  const [initialMode] = useState(pickInitialMode)
+  const [mode, setMode] = useState<'2D' | '3D'>(initialMode)
+  const [placementMessage, setPlacementMessage] = useState<string | null>(null)
 
-  // The two headline numbers are disconnected facts until something says
-  // how they relate. The finding on this field is that the bare window is
-  // in SPRING and the heaviest rain lands inside it -- that is the whole
-  // argument, and it was nowhere on the page.
-  const headline = (() => {
-    const gap = bundle.gaps[0]
-    if (!gap) return null
-    const peak = clim.erosivity_peak_doy
-    const inGap =
-      gap.start_doy <= gap.end_doy
-        ? peak >= gap.start_doy && peak <= gap.end_doy
-        : peak >= gap.start_doy || peak <= gap.end_doy
-    const span = `${doyToDate(gap.start_doy).label} to ${doyToDate(gap.end_doy).label}`
-    const share = Math.round(gap.share_of_annual_r * 100)
-    const peakLabel = doyToDate(peak).label
-    const head = `Bare ${span} — ${share}% of the year's erosive rain falls in that window`
-    if (inGap) return `${head}, straight through the ${peakLabel} peak.`
-    // Wrap-aware: the peak can sit just past the end of the gap, or just
-    // before it opens. Saying "straight through the peak" when it is five
-    // days outside would be an overstatement a judge could check.
-    const after = (peak - gap.end_doy + 365) % 365
-    const before = (gap.start_doy - peak + 365) % 365
-    if (after <= 21) return `${head}, closing just as the ${peakLabel} peak arrives.`
-    if (before <= 21) return `${head}. The ${peakLabel} peak lands just before it opens.`
-    return `${head}. The heaviest rain centres on ${peakLabel}.`
-  })()
+  // Open on the crop year where the hole is clearest.
+  useEffect(() => setPhaseKey(defaultPhaseKey(field)), [field, setPhaseKey])
 
-  const baselineCover = selected?.soil_cover ?? current.soil_cover
-  const accepted = placedFills.map((id) => fitById.get(id)).filter((fit) => fit?.feasible && fit.coverCurve.length === 365)
-  const { cover: ringCover, baselineBare, proposedBare, baselineExposure, proposedExposure } = proposalPreview(baselineCover, accepted as NonNullable<typeof accepted[number]>[], clim.erosivity_r, clim.n_obs_per_doy)
+  // Nothing can be drilled into a field that still has a crop standing on
+  // it. The backend gates its own fit on the observed harvest; the client
+  // fit uses the same gate (field.earliestSeedDoy) or the UI recommends
+  // seeding cereal rye on 15 Aug, six weeks before this field's 29 Sep harvest.
+  const fits = useMemo(
+    () => (field.mainGap ? rankSpeciesForGap(field.species, field.mainGap, field.slice, field.observedCurves, rusleB, field.earliestSeedDoy) : []),
+    [field, rusleB],
+  )
+  const fitById = useMemo(() => new Map(fits.map((fit) => [fit.speciesId, fit])), [fits])
+  const speciesById = useMemo(() => new Map(field.species.map((s) => [s.id, s])), [field])
+  const tierOf = (fit: FitResult) => tierLabel(evidenceTier(field, fit.speciesId, fit.curveSource), bundle.crop_curves[fit.speciesId]?.n_fields)
 
-  const placeCrop = (day: number, speciesId = draggingSpeciesId) => {
-    if (!speciesId) return
-    const fit = fitById.get(speciesId)
-    const species = bundle.species.find((s) => s.id === speciesId)
-    const decision = placeDecision(fit, species, bundle.gaps[0], day, earliestSeedDoy)
-    if (!decision.accepted) { setPlacementMessage(decision.reason); return }
-    addPlacedFill(speciesId)
-    setDraggingSpecies(null)
+  // What is proposed: the user's own plan, else a preset rotation, else nothing.
+  const selected = bundle.rotations.find((r) => r.id === selectedRotationId && !r.is_current) ?? null
+  const presetCurves = useMemo(() => (selected ? rotationFillCurves(field, selected) : null), [field, selected])
+  const customFits = useMemo(() => placedFills.map((id) => fitById.get(id)).filter(usableFit), [placedFills, fitById])
+  const proposalCurves = useMemo(() => (customFits.length ? customFits.map((fit) => fit.coverCurve) : presetCurves ?? []), [customFits, presetCurves])
+  const proposing = customFits.length > 0 || selected !== null
+  // A preset the client cannot rebuild exactly is shown only as the bundle's own average curve.
+  const averageOnly = selected !== null && customFits.length === 0 && presetCurves === null
+
+  // The headline and the planner must both be the bundle's phase-averaged
+  // figures, NOT counts taken off the mean cover curve. Thresholding a mean
+  // is not the mean of the thresholds: Story County reads 110 instead of 104
+  // that way, and Monona reads 0 for a field that is bare 14 days after corn.
+  const baseline = useMemo(() => scoreCover(field, [], rusleB), [field, rusleB])
+  const proposed: CoverScore = useMemo(
+    () => (averageOnly && selected
+      ? { bareDays: selected.bare_days, bareDaysByPhase: selected.bare_days_by_phase ?? null, exposedR: selected.exposed_r }
+      : scoreCover(field, proposalCurves, rusleB)),
+    [averageOnly, selected, field, proposalCurves, rusleB],
+  )
+  const phaseSplit = facts.byPhase.length ? facts.byPhase.map((p) => `${p.days} after ${p.key}`).join(', ') : null
+
+  // What the ring draws: one crop year (or the average), plus the proposal.
+  const phase = averageOnly ? null : field.phases.find((p) => p.key === phaseKey) ?? null
+  const baseCover: number[] = phase ? phase.cover : clim.soil_cover
+  const ringCover = useMemo(
+    () => (averageOnly && selected ? selected.soil_cover : proposalCurves.length ? spliceRotationCover(baseCover, proposalCurves) : baseCover),
+    [averageOnly, selected, proposalCurves, baseCover],
+  )
+
+  const pickedFit = draggingSpeciesId ? fitById.get(draggingSpeciesId) : undefined
+  const plantingDoys = useMemo(() => {
+    const species = pickedFit ? speciesById.get(pickedFit.speciesId) : undefined
+    return pickedFit?.feasible && species && field.mainGap
+      ? candidateSeedDoys(species, field.mainGap, PRE_GAP_SEEDING_DAYS, field.earliestSeedDoy)
+      : []
+  }, [pickedFit, speciesById, field])
+
+  const placeCrop = (day: number) => {
+    if (!draggingSpeciesId) return
+    const decision = placeDecision(fitById.get(draggingSpeciesId), speciesById.get(draggingSpeciesId), field.mainGap ?? undefined, day, field.earliestSeedDoy)
     setPlacementMessage(decision.reason)
+    if (!decision.accepted) return
+    addPlacedFill(draggingSpeciesId)
+    setDraggingSpecies(null)
   }
 
-  return <div className="site-shell" data-season={seasonAtDoy(selectedDoy)} id="top">
-    {bundle.provenance.is_synthetic && <div className="fixture-banner" role="status"><span>✳</span> SYNTHETIC SAMPLE — simulated soil cover; no satellite observations. <span>✳</span></div>}
+  const switchFarm = (id: string) => {
+    if (id === farmId) return
+    // A plan or a preset belongs to the field it was made on.
+    selectRotation(null)
+    resetPlacedFills()
+    setDraggingSpecies(null)
+    setPlacementMessage(null)
+    onSelectFarm(id)
+  }
+
+  const season = seasonAtDoy(selectedDoy)
+  const hoverObs = hoveredDoy ? clim.n_obs_per_doy[hoveredDoy - 1] : 0
+  const hoverText = hoveredDoy
+    ? `${doyToDate(hoveredDoy).label} · ${hoverObs > 0 ? `soil cover ${(ringCover[hoveredDoy - 1] * 100).toFixed(0)}%` : 'soil cover unknown'} · ${hoverObs} ${synthetic ? 'simulated samples' : 'satellite observations'}`
+    : synthetic
+      ? 'Interactive synthetic sample. No satellite cover observations are claimed.'
+      : 'Hover or select a day to read the field. The painted season is decoration; the numbers are data.'
+  // A day can read covered on the average and still sit inside a gap that is
+  // bare in one phase. Give the per-phase figures and say what the ring shows.
+  const phaseCaption = field.phases.length > 1
+    ? `This day by rotation phase: ${field.phases.map((p) => `${p.key} ${(p.cover[selectedDoy - 1] * 100).toFixed(0)}% (${p.cover[selectedDoy - 1] < BARE_THRESHOLD ? 'bare' : 'covered'})`).join(' · ')}. ${phase ? `The ring is showing the ${phase.key} year.` : 'The ring shows their mean, so a day can read covered here and still sit inside a gap that is bare in one phase.'}`
+    : null
+
+  const ringProps = {
+    showLegend: false,
+    soilCover: ringCover,
+    erosivity: clim.erosivity_r,
+    nObs: clim.n_obs_per_doy,
+    frostProb: clim.frost_prob,
+    // Green and residue evidence exist only for the all-years average.
+    greenCover: phase ? undefined : clim.green_cover,
+    residueCover: phase ? undefined : clim.residue_cover,
+    compareCover: proposing ? baseCover : undefined,
+    highlightDoys: plantingDoys.length ? plantingDoys : undefined,
+    yearLabel: phase ? phase.label : 'Average year',
+    selectedDoy,
+    onHoverDay: setHoveredDoy,
+    onSelectDay: setSelectedDoy,
+    onActivateDay: (day: number) => { if (draggingSpeciesId) placeCrop(day) },
+    onModeChange: setMode,
+    reducedMotion,
+    synthetic,
+  }
+
+  return <div className="site-shell" data-season={season} id="top">
+    {synthetic && <div className="fixture-banner" role="status"><span>✳</span> SYNTHETIC SAMPLE — simulated soil cover; no satellite observations. <span>✳</span>{skipped.length > 0 && <small className="fixture-detail">Real field bundle unavailable: {skipped.join(' · ')}</small>}</div>}
     <nav className="topbar" aria-label="Site navigation">
       <a className="brand" href="#top"><span className="brand-seal" aria-hidden="true">✺</span><span>Fallow Clock<small>THE LIVING YEAR</small></span></a>
-      <div className="top-links"><a href="#year">The year</a><a href="#planner">Crop studio</a><a href="#evidence">Field notes</a></div>
+      <div className="top-links"><a href="#year">The year</a><a href="#planner">The decision</a><a href="#evidence">Evidence</a></div>
       <AudioAtmosphere doy={selectedDoy} />
     </nav>
 
     <header className="workspace-intro" id="year">
-      <div className="overview-copy"><span className="eyebrow">✦ THE LIVING YEAR · {bundle.farm.place}</span><h1>Find the <em>hole</em> in your year.</h1><p>{headline ?? 'Explore soil cover, rainfall erosivity, and the seasons around one field.'}</p><div className="farm-switch" role="group" aria-label="Choose a field">{FARMS.map((f) => <button type="button" key={f.id} onClick={() => setFarmId(f.id)} aria-pressed={farmId === f.id} className={farmId === f.id ? 'is-active' : ''}>{f.label}</button>)}</div><small>{bundle.provenance.is_synthetic ? 'Interactive sample field' : bundle.farm.owner_name.startsWith('TBD') ? 'Observed Story County field' : bundle.farm.owner_name} · {bundle.farm.area_ha} ha</small></div>
+      <div className="overview-copy">
+        <span className="eyebrow">✦ THE LIVING YEAR · {bundle.farm.place}</span>
+        <h1>Find the <em>hole</em> in your year.</h1>
+        <p>{finding ?? 'Explore soil cover, rainfall erosivity, and the seasons around one field.'}</p>
+        <div className="farm-switch" role="group" aria-label="Choose a field">
+          {FARMS.map((f) => <button type="button" key={f.id} onClick={() => switchFarm(f.id)} aria-pressed={farmId === f.id} className={farmId === f.id ? 'is-active' : ''}>{f.label}</button>)}
+        </div>
+        <small>{synthetic ? 'Interactive sample field' : persona ? persona.disclosure : bundle.observed_rotation.inferred_label} · {bundle.farm.area_ha} ha</small>
+      </div>
       <div className="field-summary overview-summary" aria-label="Field overview">
-        <div><span className="eyebrow">{bundle.provenance.is_synthetic ? 'From this sample' : 'From this field'}</span><strong>{current.bare_days} <small>days</small></strong><p>{phaseSplit ?? `of ${bundle.provenance.is_synthetic ? 'simulated' : 'observed'} bare soil expected per year`}</p></div>
-        <div><span className="eyebrow">Erosivity overlap</span><strong>{Math.round((bundle.gaps[0]?.share_of_annual_r ?? 0) * 100)}<small>%</small></strong><p>of annual erosivity overlaps the largest bare gap</p></div>
+        <div>
+          <span className="eyebrow">{synthetic ? 'From this sample' : 'Bare soil, typical year'}</span>
+          <strong>{facts.bareDays} <small>days</small></strong>
+          <p>{phaseSplit ?? `of ${synthetic ? 'simulated' : 'observed'} bare soil expected per year`}{facts.unknownDays > 0 ? ` · ${facts.unknownDays} days unobserved` : ''}</p>
+        </div>
+        <div>
+          <span className="eyebrow">Rain on bare soil</span>
+          <strong>{facts.gapSharePct}<small>%</small></strong>
+          <p>of the year&rsquo;s erosive rain falls in the main bare gap</p>
+        </div>
       </div>
     </header>
 
     <main className="workspace-main">
       <div className="main-grid">
         <section className="ring-column" aria-label="Interactive agricultural calendar">
-          <div className="hero-world" data-season={seasonAtDoy(selectedDoy)} data-mode={mode} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); setPlacementMessage('Drop the packet onto a day on the wheel, or use the suggested date button.') }}>
+          {field.phases.length > 0 && <PhaseToggle phases={facts.byPhase} active={phase?.key ?? null} onChange={setPhaseKey} locked={averageOnly} />}
+          <div className="hero-world" data-season={season} data-mode={mode} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); setPlacementMessage('Drop the packet onto a highlighted day on the wheel, or use “Place at suggested date”.') }}>
             <Suspense fallback={null}><SeasonalWorld doy={selectedDoy} /></Suspense>
-            <YearRing initialMode="3D" showLegend={false} soilCover={ringCover} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} frostProb={clim.frost_prob} greenCover={clim.green_cover} residueCover={clim.residue_cover} compareCover={selected ? current.soil_cover : accepted.length ? baselineCover : undefined} highlightDoys={plantingDoys} selectedDoy={selectedDoy} onHoverDay={setHoveredDoy} onSelectDay={setSelectedDoy} onActivateDay={(day) => draggingSpeciesId && placeCrop(day)} onModeChange={setMode} reducedMotion={reducedMotion} synthetic={bundle.provenance.is_synthetic} />
+            <ErrorBoundary fallback={<YearRing {...ringProps} initialMode="2D" />}>
+              <YearRing {...ringProps} initialMode={initialMode} />
+            </ErrorBoundary>
           </div>
           <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
           {placementMessage && <p className="placement-message" role="status">{placementMessage}</p>}
         </section>
 
         <aside className="planner-column" id="planner">
-          <details className="sidebar-section sidebar-day" open><summary>Selected day & climate</summary><AtmosphereReadout doy={selectedDoy} climate={clim} synthetic={bundle.provenance.is_synthetic} /><p className="ring-caption">{hoveredDoy ? `DOY ${hoveredDoy} · ${clim.n_obs_per_doy[hoveredDoy - 1] > 0 ? `soil cover ${(ringCover[hoveredDoy - 1] * 100).toFixed(0)}%` : 'soil cover unknown'} · ${clim.n_obs_per_doy[hoveredDoy - 1]} ${bundle.provenance.is_synthetic ? 'simulated' : 'observations'}` : bundle.provenance.is_synthetic ? 'Interactive synthetic sample. No satellite cover observations are claimed.' : 'Hover or select a day to read the field. The illustrated season is decorative.'}</p>{phaseCovers && phaseLabels && phaseCovers.length === phaseLabels.length && <p className="ring-caption phase-caption">This day by rotation phase: {phaseCovers.map((pc, i) => `${phaseLabels[i]} ${(pc[selectedDoy - 1] * 100).toFixed(0)}% (${pc[selectedDoy - 1] < 0.3 ? 'bare' : 'covered'})`).join(' · ')}. The ring shows their mean, so a day can read covered here and still sit inside a gap that is bare in one phase.</p>}</details>
-          <CropPlanner species={bundle.species} fits={ranked} picked={draggingSpeciesId} placed={placedFills} onPick={setDraggingSpecies} onPlace={() => pickedFit && placeCrop(pickedFit.seedDoy)} onRemove={removePlacedFill} onReset={resetPlacedFills} baselineBare={baselineBare} proposedBare={proposedBare} baselineExposure={baselineExposure} proposedExposure={proposedExposure} />
-          <details className="sidebar-section"><summary>Rotation paths</summary>
-<section className="rotation-card"><div className="card-title"><span className="eyebrow">Compare futures</span><h2>Rotation paths</h2></div><div className="rotation-list">{bundle.rotations.map((r) => <button type="button" key={r.id} onClick={() => selectRotation(r.is_current ? null : r.id)} aria-pressed={(selected?.id ?? current.id) === r.id} className="rotation-option"><span className="rotation-icon" aria-hidden="true">{r.is_current ? '◌' : '✿'}</span><span className="rotation-copy"><strong>{r.label}</strong><small>{r.bare_days} bare days · {r.added_seed_cost_usd_ha > 0 ? `+$${r.added_seed_cost_usd_ha}/ha seed` : 'current practice'}{r.n_credit_kg_ha > 0 ? ` · ${r.n_credit_kg_ha} kg N/ha credit` : ''}</small></span><span className="rotation-delta">{r.delta_vs_current_pct === 0 ? 'Baseline' : `${r.delta_vs_current_pct.toFixed(0)}% soil loss`}</span></button>)}</div></section>
+          <RotationCompare field={field} selectedId={selected?.id ?? null} onSelect={(id) => { selectRotation(id); setPlacementMessage(null) }} />
+          <CropPlanner species={field.species} fits={fits} picked={draggingSpeciesId} placed={placedFills} onPick={setDraggingSpecies} onPlace={() => pickedFit && placeCrop(pickedFit.seedDoy)} onRemove={removePlacedFill} onReset={resetPlacedFills} baseline={baseline} proposed={proposed} tierOf={tierOf} />
+          <details className="sidebar-section sidebar-day" open><summary>Selected day &amp; climate</summary>
+            <AtmosphereReadout doy={selectedDoy} climate={{ ...clim, soil_cover: baseCover }} synthetic={synthetic} />
+            <p className="ring-caption">{hoverText}</p>
+            {phaseCaption && <p className="ring-caption phase-caption">{phaseCaption}</p>}
           </details>
         </aside>
       </div>
-<section className="field-notes" id="evidence"><div className="section-heading"><span className="section-number">02 / FIELD NOTES</span><h2>Beauty, with evidence beneath it.</h2><p>Planting ideas are proposals. We keep observations, modelled cover, and uncertainty visible.</p></div><div className="evidence-legend"><RingLegend compact showDetails /></div><div className="notes-grid">
-        <article className="notes-card"><div className="notes-card-title"><span className="notes-ornament">❦</span><div><span className="eyebrow">Crop fit</span><h3>What fits the longest gap</h3></div></div><ol className="fit-list">{ranked.slice(0, 6).map((fit, index) => <li key={fit.speciesId} className={fit.feasible ? '' : 'unavailable'}><span className="fit-number">{String(index + 1).padStart(2, '0')}</span><span><strong>{fit.speciesName}</strong><small>{fit.feasible ? `${fit.curveSource} cover · suggested seed day ${fit.seedDoy}` : fit.reason}</small></span><span className="fit-benefit">{fit.feasible ? `−${fit.pctReduction.toFixed(0)}%` : '—'}</span></li>)}</ol><p className="notes-footnote">Reduction in erosion exposure within the largest gap. Ranked by <strong>evidence first</strong>: a species we measured on neighbouring fields outranks a modelled one even when the model promises more. Every modelled curve uses the same generic plateau, so modelled species tie at identical percentages and read higher than they should — the measured curve is lower because it is real. Treat modelled figures as an upper bound.</p></article>
-        <article className="notes-card"><div className="notes-card-title"><span className="notes-ornament">✧</span><div><span className="eyebrow">Uncertainty ledger</span><h3>What we do not know</h3></div></div><ul className="uncertainty-list">{bundle.uncertainty.map((u, i) => <li key={i}><div><span className={`uncertainty-level level-${u.level}`}>{u.level}</span><code>{u.field}</code></div><p>{u.reason}</p><small>{u.affects}</small></li>)}</ul></article>
-      </div><div className="provenance-strip"><span>✦ &nbsp; DATA SOURCES</span><div>{bundle.provenance.sources.map((source, i) => <span key={i}>{source.name}</span>)}</div><small>Years: {bundle.provenance.years_used.join(', ') || 'unspecified'}</small></div></section>
-
+      <FieldNotes field={field} fits={fits} />
     </main>
-    <footer className="site-footer"><span className="footer-mark" aria-hidden="true">✺</span><div><strong>Fallow Clock</strong><small>A living view of the agricultural year.</small></div><p>Seasonal artwork illustrates time and atmosphere. Field values and planning estimates come from the loaded data bundle.</p><nav aria-label="Footer navigation"><a href="#year">The year</a><a href="#planner">Crop studio</a><a href="#evidence">Field notes</a><a href="#top">Back to top ↑</a></nav></footer>
+    <footer className="site-footer"><span className="footer-mark" aria-hidden="true">✺</span><div><strong>Fallow Clock</strong><small>A living view of the agricultural year.</small></div><p>Seasonal artwork illustrates time and atmosphere. Field values and planning estimates come from the loaded data bundle.</p><nav aria-label="Footer navigation"><a href="#year">The year</a><a href="#planner">The decision</a><a href="#evidence">Evidence</a><a href="#top">Back to top ↑</a></nav></footer>
   </div>
 }

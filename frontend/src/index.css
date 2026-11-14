@@ -455,9 +455,10 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   .site-footer nav { width: 100%; }
 }
 
-/* Per-phase reading of the selected day: the ring shows the MEAN cover, so a
-   day can read covered while still sitting inside a gap that is bare in one
-   phase of the rotation. Say so rather than letting the two look contradictory. */
+/* Per-phase reading of the selected day: on the average view the ring shows
+   the MEAN cover, so a day can read covered while still sitting inside a gap
+   that is bare in one phase of the rotation. Say so rather than letting the
+   two look contradictory. */
 .phase-caption { margin-top: 6px; padding-top: 6px; border-top: 1px dashed #acc9b36b; color: #5c6f62; }
 
 /* Field switcher. Both observed fields matter: one needs a cover crop, the
@@ -467,3 +468,34 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .farm-switch button:hover { background: #ffffff24; }
 .farm-switch button.is-active { background: #f6f8ee; color: #1b5e4a; }
 .farm-switch button:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
+
+/* U2: phase toggle, rotation comparison, evidence cards. */
+.phase-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin-bottom: 8px; padding: 8px 12px; border: 1px solid #a8c7ad; border-radius: 14px; background: #f9faed; }
+.phase-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.phase-buttons button { display: flex; flex-direction: column; align-items: flex-start; padding: 5px 11px; border: 1px solid #c9d8c4; border-radius: 10px; background: #fff; color: #2f5745; font: 700 12px system-ui; cursor: pointer; }
+.phase-buttons button small { color: #6d7d70; font-weight: 500; font-size: 10px; }
+.phase-buttons button[aria-pressed="true"] { background: #cde9c6; border-color: #4b9a79; color: #175b4b; }
+.phase-buttons button:disabled { opacity: .45; cursor: not-allowed; }
+.phase-toggle p { flex: 1 1 220px; margin: 0; color: #66746a; font-size: 11px; line-height: 1.35; }
+.rotation-compare { padding: 15px; border: 1px solid #b8cdb9; border-radius: 17px; background: #fbfcf3; box-shadow: 0 12px 28px #6d593214; }
+.rotation-compare .planner-heading { margin-bottom: 10px; }
+.rotation-compare .rotation-copy b { color: #254f3d; }
+.rotation-delta { display: flex; flex-direction: column; align-items: flex-end; font-size: 16px; }
+.rotation-delta small { color: #748075; font: 500 9px system-ui; }
+.tier-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.tier-chip { padding: 2px 7px; border-radius: 99px; font: 700 9px system-ui; }
+.tier-observed { background: #d9efdf; color: #1e5f45; }
+.tier-literature { background: #f5e7bd; color: #84642e; }
+.tier-modelled { background: #e8e5f1; color: #4f4a72; }
+.fixture-detail { display: block; margin-top: 4px; font: 500 10px system-ui; letter-spacing: 0; opacity: .85; }
+.evidence-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; margin-bottom: 18px; }
+.evidence-card h3 { margin: 4px 0 10px; font-size: 19px; }
+.evidence-card > p { color: #455249; font-size: 12px; line-height: 1.5; }
+.year-list, .source-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.year-list li { display: grid; grid-template-columns: 42px 76px 1fr; gap: 6px; align-items: baseline; padding-bottom: 5px; border-bottom: 1px dashed #d7ddcf; font-size: 12px; color: #355342; }
+.year-list small, .source-list small { color: #798175; font-size: 10px; }
+.source-list li { display: flex; flex-direction: column; gap: 2px; padding-bottom: 6px; border-bottom: 1px dashed #d7ddcf; font-size: 12px; color: #355342; }
+.source-citation { overflow-wrap: anywhere; }
+.fit-group { margin: 12px 0 2px; color: #8a6f4f; font: 800 10px system-ui; letter-spacing: .12em; text-transform: uppercase; }
+.uncertainty-list { max-height: none; }
+@media (max-width: 1100px) { .evidence-grid { grid-template-columns: 1fr; } }
