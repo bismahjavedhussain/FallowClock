@@ -36,9 +36,12 @@ from fallowclock.cache import cache_stats  # noqa: E402
 from fallowclock.schema import Bundle, Farm  # noqa: E402
 
 try:
-    from scripts.build_bundle import FARMS
+    from scripts.build_bundle import FARMS, imagery_for
 except ImportError:  # running from a different cwd
     FARMS = {}
+
+    def imagery_for(farm_id: str):  # type: ignore[misc]
+        return None, None
 
 BUNDLE_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public" / "bundles"
 
@@ -101,6 +104,39 @@ def area_ha(polygon: dict, lat: float) -> float:
 
 def in_conus(lon: float, lat: float) -> bool:
     return CONUS[0] <= lon <= CONUS[2] and CONUS[1] <= lat <= CONUS[3]
+
+
+def point_in_ring(lon: float, lat: float, ring: list) -> bool:
+    """Ray casting. Our field polygons are small convex rectangles, so this
+    does not need to be clever -- it needs to be right."""
+    inside = False
+    n = len(ring)
+    for i in range(n):
+        x1, y1 = ring[i][0], ring[i][1]
+        x2, y2 = ring[(i + 1) % n][0], ring[(i + 1) % n][1]
+        if (y1 > lat) != (y2 > lat):
+            x_at = x1 + (lat - y1) * (x2 - x1) / (y2 - y1)
+            if lon < x_at:
+                inside = not inside
+    return inside
+
+
+def known_field_at(lon: float, lat: float) -> str | None:
+    """The precomputed farm whose field this point falls inside, if any.
+
+    This is how a judge who draws over one of our two fields gets the REAL
+    satellite cover instead of a synthetic placeholder. It is deliberately
+    containment and not nearest-neighbour: handing one field's observed
+    cover curve to a different field would be making data up.
+    """
+    for fid, f in FARMS.items():
+        try:
+            ring = f.polygon_geojson["coordinates"][0]
+        except (KeyError, IndexError, TypeError):
+            continue
+        if point_in_ring(lon, lat, ring):
+            return fid
+    return None
 
 
 def nearest_precomputed(lon: float, lat: float) -> str | None:
@@ -170,9 +206,32 @@ def build(req: BundleRequest) -> dict:
         polygon_geojson=req.polygon,
     )
 
+    # Cover curves need ~1,500 satellite scenes per field and 20-30 minutes,
+    # so an arbitrary polygon cannot have real ones inside a web request.
+    # What it CAN have, honestly, is the real NASA POWER half -- weather,
+    # erosivity and soil water -- with the cover half flagged synthetic.
+    imagery, _ = (None, None)
+    known = known_field_at(lon, lat)
+    if known:
+        imagery, _ = imagery_for(known)
+        if imagery is not None:
+            caveats.append(
+                f"This polygon falls inside our precomputed field "
+                f"'{known}', so the cover curves are that field's real "
+                f"Sentinel-2 and Landsat observations."
+            )
+    if imagery is None:
+        caveats.append(
+            "Cover curves are SYNTHETIC placeholders. Building real ones "
+            "takes about 1,500 satellite scenes and 20-30 minutes, which "
+            "does not fit in a web request. Weather, erosivity and soil "
+            "water below are real NASA POWER data; the cover half is not."
+        )
+
     try:
         bundle: Bundle = build_for_farm(
-            farm, start_year=req.start_year, end_year=req.end_year
+            farm, start_year=req.start_year, end_year=req.end_year,
+            imagery=imagery,
         )
     except Exception as exc:  # noqa: BLE001 - a judge gets an answer, not a stack trace
         fid = nearest_precomputed(lon, lat)

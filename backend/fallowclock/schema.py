@@ -120,6 +120,14 @@ class Climatology(Strict):
         description="SMAP, 0-1. COARSE (9-11 km) -- regional flag only, never "
         "presented as a field-scale number."
     )
+    phase_covers: list[DoyFloats] | None = Field(
+        default=None,
+        description="One soil_cover curve per rotation phase, ordered as "
+        "observed_rotation.phase_labels. soil_cover is their MEAN, which is a "
+        "curve no real year followed: a day can be covered on the mean and "
+        "bare in half the actual years. gaps[] is built from these, not from "
+        "soil_cover. None when the rotation has only one phase.",
+    )
 
     @model_validator(mode="after")
     def _soil_cover_is_the_union(self) -> Climatology:
@@ -168,6 +176,12 @@ class ObservedYear(Strict):
 class ObservedRotation(Strict):
     years: list[ObservedYear] = Field(min_length=1)
     inferred_label: str = Field(description="e.g. 'Corn-Soybean, no cover'")
+    phase_labels: list[str] | None = Field(
+        default=None,
+        description="Crop phase of the rotation, e.g. ['soybean', 'corn']. "
+        "Indexes line up with Rotation.bare_days_by_phase. None when the "
+        "rotation could not be split into phases.",
+    )
 
 
 class Gap(Strict):
@@ -257,7 +271,22 @@ class Rotation(Strict):
     soil_cover: DoyFloats = Field(
         description="Spliced from observed crop curves. Never simulated."
     )
-    bare_days: int = Field(ge=0, le=DOY_LEN)
+    bare_days: int = Field(
+        ge=0,
+        le=DOY_LEN,
+        description="Expected bare days in a randomly chosen year. When the "
+        "rotation has phases this is the mean of bare_days_by_phase, NOT the "
+        "bare days of the mean cover curve -- see "
+        "gaps.phase_averaged_bare_days for why those differ and why the "
+        "difference does not have a predictable sign.",
+    )
+    bare_days_by_phase: list[int] | None = Field(
+        default=None,
+        description="Bare days in each phase, ordered as "
+        "observed_rotation.phase_labels. A corn-soybean field is bare for "
+        "different stretches after corn than after soybeans; the mean hides "
+        "that, so show both.",
+    )
     exposed_r: float = Field(ge=0)
     delta_vs_current_pct: float = Field(
         description="Negative is better (less exposed erosivity)"
@@ -309,12 +338,18 @@ class Bundle(Strict):
     def _gaps_agree_with_soil_cover(self) -> Bundle:
         """The gaps array must actually describe the climatology it ships with.
         Catches the case where someone recomputes one and forgets the other."""
-        bare = sum(1 for v in self.climatology.soil_cover if v < BARE_THRESHOLD)
+        pc = self.climatology.phase_covers
+        if pc:
+            worst = [min(vals) for vals in zip(*pc)]
+        else:
+            worst = self.climatology.soil_cover
+        bare = sum(1 for v in worst if v < BARE_THRESHOLD)
         claimed = sum(g.n_days for g in self.gaps)
         if abs(bare - claimed) > 2:  # tolerance for boundary rounding
             raise ValueError(
-                f"climatology.soil_cover has {bare} bare days but gaps[] "
-                f"claims {claimed}. They were computed from different data."
+                f"The cover curves have {bare} bare days (across all phases) "
+                f"but gaps[] claims {claimed}. They were computed from "
+                f"different data."
             )
         return self
 

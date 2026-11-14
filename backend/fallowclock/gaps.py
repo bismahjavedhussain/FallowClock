@@ -145,6 +145,7 @@ def build_gaps(
     erosivity_r: list[float],
     threshold: float = BARE_THRESHOLD,
     b: float = RUSLE_B_DEFAULT,
+    phase_covers: list[list[float]] | None = None,
 ) -> list[Gap]:
     """Detect bare gaps and score each one.
 
@@ -154,15 +155,27 @@ def build_gaps(
     year's erosive rain falls while this field is bare" -- which is a
     statement about the rain, not about the cover.
     """
-    runs = find_bare_runs(soil_cover, threshold)
+    # With phases, a gap is a run bare in ANY phase -- the window a cover
+    # crop has to cover to protect every year of the rotation. Running this
+    # on the mean curve instead loses whole gaps: Monona County's corn phase
+    # is bare for 14 days after planting and its soybean phase is not, and
+    # on the mean the field reads as never bare at all.
+    if phase_covers:
+        runs = phase_union_bare_runs(phase_covers, threshold)
+        covers = phase_covers
+    else:
+        runs = find_bare_runs(soil_cover, threshold)
+        covers = [soil_cover]
     annual_r = sum(erosivity_r)
 
     gaps: list[Gap] = []
     for start_idx, end_idx in runs:
         idxs = doys_in_run(start_idx, end_idx)
+        # Phase-averaged, for the same Jensen reason as everywhere else.
         gap_exposed = sum(
-            erosivity_r[i] * rusle_c_factor(soil_cover[i], b) for i in idxs
-        )
+            sum(erosivity_r[i] * rusle_c_factor(c[i], b) for i in idxs)
+            for c in covers
+        ) / len(covers)
         gap_raw_r = sum(erosivity_r[i] for i in idxs)
         gaps.append(
             Gap(
@@ -198,6 +211,74 @@ def bare_days(
 ) -> int:
     _check_len(soil_cover, "soil_cover")
     return sum(1 for v in soil_cover if v < threshold)
+
+
+def phase_bare_days(
+    phase_covers: list[list[float]], threshold: float = BARE_THRESHOLD
+) -> list[int]:
+    """Bare-day count for each phase of a rotation, in the order given."""
+    if not phase_covers:
+        raise ValueError("Need at least one phase")
+    for i, cover in enumerate(phase_covers):
+        _check_len(cover, f"phase_covers[{i}]")
+    return [bare_days(cover, threshold) for cover in phase_covers]
+
+
+def phase_averaged_bare_days(
+    phase_covers: list[list[float]], threshold: float = BARE_THRESHOLD
+) -> float:
+    """Expected bare days in a randomly chosen year of the rotation.
+
+        RIGHT:  mean over phases of  |{d : cover_phase(d) < threshold}|
+        WRONG:  |{d : mean over phases of cover_phase(d) < threshold}|
+
+    Same shape of error as phase_averaged_exposed_erosivity, and the same
+    cause -- a non-linear function applied to an average instead of averaged
+    over the real years -- but with one difference that matters and that we
+    should not paper over:
+
+    THE SIGN IS NOT GUARANTEED HERE. Erosivity goes through exp(-bx), which
+    is convex, so Jensen's inequality fixes the direction: mean cover always
+    understates erosion. Bare days go through an INDICATOR, 1[x < threshold],
+    which is a step -- neither convex nor concave. Averaging the cover can
+    therefore hide bare days or invent them, depending on where the phases
+    sit relative to the threshold, and the direction can differ between two
+    fields in the same county. Both of ours do exactly that:
+
+        Story County   mean cover 110 bare days, phase-averaged 104  (-6)
+        Monona County  mean cover   0 bare days, phase-averaged   7  (+7)
+
+    Monona is the case worth understanding. Neither phase is bare on the
+    mean curve, but the corn phase has a 14-day bare window after planting
+    that the soybean phase covers over. Average first and that window
+    disappears from the year entirely -- a gap the field really has, which
+    no cover crop would ever be fitted into, because nothing downstream can
+    see it.
+
+    Averaging the cover also invents days belonging to no real year: a corn
+    canopy standing while soybean stubble sits bare averages to a spurious
+    "marginally covered" day that never happened on this field.
+    """
+    return sum(phase_bare_days(phase_covers, threshold)) / len(phase_covers)
+
+
+def phase_union_bare_runs(
+    phase_covers: list[list[float]], threshold: float = BARE_THRESHOLD
+) -> list[tuple[int, int]]:
+    """Runs bare in ANY phase of the rotation.
+
+    This is the window a cover crop has to cover to protect every year of
+    the rotation, which is a different question from "is the average year
+    bare here" and is the one a seeding plan has to answer. A day bare in
+    the soybean phase and covered in the corn phase is still a day this
+    field is bare every other year.
+    """
+    if not phase_covers:
+        raise ValueError("Need at least one phase")
+    for i, cover in enumerate(phase_covers):
+        _check_len(cover, f"phase_covers[{i}]")
+    worst = [min(vals) for vals in zip(*phase_covers)]
+    return find_bare_runs(worst, threshold)
 
 
 #: Daily frost probability at which we call a stand killed.

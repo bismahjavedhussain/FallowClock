@@ -74,6 +74,20 @@ MIN_SEEDING_MOISTURE = 0.15
 # the observed harvest date instead of relying on this default.
 PRE_GAP_SEEDING_DAYS = 60
 
+# A winter-hardy cover crop is seeded in autumn precisely so that it is
+# standing the FOLLOWING spring, and on a reduced-tillage field the spring
+# window is the one that matters: Story County's residue mat holds cover
+# above the bare threshold all winter, then thins after planting, leaving
+# the field bare DOY 88-159 -- straight through the DOY 170 erosivity peak.
+#
+# With a flat 60-day lead, cereal rye's seeding window (DOY 227-319) misses
+# that gap by four months and the model reports "seeding window does not
+# overlap this gap" for every winter-hardy species. The single most
+# important cover crop in the Midwest came back infeasible on both of our
+# real fields, and the "+ cereal rye" rotation scored identically to doing
+# nothing. The lead has to span a winter for the species that overwinter.
+WINTER_HARDY_PRE_GAP_DAYS = 300
+
 # Once a non-hardy stand is frost-killed its residue decomposes. Roughly
 # halves over a winter and floors at a persistent mat. This is what
 # separates a radish (dead by November, residue thinning all winter) from
@@ -164,7 +178,16 @@ def candidate_seed_doys(
     if earliest_seed_doy is not None:
         start_idx = earliest_seed_doy - 1
     else:
-        start_idx = (gap.start_doy - 1 - pre_gap_days) % DOY_LEN
+        lead = pre_gap_days
+        if species.winter_hardy:
+            lead = max(lead, WINTER_HARDY_PRE_GAP_DAYS)
+        # The seeding period is lead + gap, and it must not exceed a year.
+        # Without this cap it wraps PAST itself and doys_in_run returns the
+        # complement -- the window the species may NOT be seeded in. A
+        # 300-day lead on a 216-day gap silently became a 151-day period
+        # that excluded rye's entire autumn window.
+        lead = max(0, min(lead, DOY_LEN - gap.n_days))
+        start_idx = (gap.start_doy - 1 - lead) % DOY_LEN
     doys = doys_in_run(start_idx, gap.end_doy - 1)
     return [d + 1 for d in doys if _in_window(d + 1, species.seeding_window)]
 
@@ -263,6 +286,7 @@ def fit_species_in_gap(
     base_soil_cover: list[float],
     observed_curve: list[float] | None = None,
     b: float = RUSLE_B_DEFAULT,
+    earliest_seed_doy: int | None = None,
 ) -> FitResult:
     """Best feasible seeding date for one species in one gap.
 
@@ -272,7 +296,7 @@ def fit_species_in_gap(
     in time" is useful information, not noise to filter out.
     """
     gdd_daily = gdd_base10 if species.tbase_c >= 10.0 else gdd_base4
-    candidates = candidate_seed_doys(species, gap)
+    candidates = candidate_seed_doys(species, gap, earliest_seed_doy=earliest_seed_doy)
 
     if not candidates:
         return FitResult(
@@ -398,8 +422,13 @@ def rank_species_for_gap(
     base_soil_cover: list[float],
     observed_curves: dict[str, list[float]] | None = None,
     b: float = RUSLE_B_DEFAULT,
+    earliest_seed_doy: int | None = None,
 ) -> list[FitResult]:
-    """All species scored for one gap, feasible first, best reduction first."""
+    """All species scored for one gap, feasible first, best reduction first.
+
+    `earliest_seed_doy` is the observed cash-crop harvest: nothing can be
+    drilled into a field that still has a crop standing on it.
+    """
     observed_curves = observed_curves or {}
     results = [
         fit_species_in_gap(
@@ -413,6 +442,7 @@ def rank_species_for_gap(
             base_soil_cover,
             observed_curve=observed_curves.get(sp.id),
             b=b,
+            earliest_seed_doy=earliest_seed_doy,
         )
         for sp in species_list
     ]

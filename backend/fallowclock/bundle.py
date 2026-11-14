@@ -65,6 +65,10 @@ class ImageryInputs:
     #: Optional but strongly preferred -- without it erosivity is computed
     #: from mean cover, which understates it (Jensen's inequality).
     phase_covers: list[list[float]] | None = None
+    #: Crop name of each phase, same order as `phase_covers`
+    #: (e.g. ["soybean", "corn"]). Optional: without it the UI can still
+    #: show per-phase bare days, just not say which phase is which.
+    phase_labels: list[str] | None = None
 
     def validate(self) -> None:
         for name in (
@@ -77,6 +81,20 @@ class ImageryInputs:
         for i, (lo, hi) in enumerate(zip(self.green_cover_p25, self.green_cover_p75)):
             if lo > hi + 1e-9:
                 raise ValueError(f"green_cover_p25[{i}] > p75")
+        if self.phase_covers:
+            for i, cover in enumerate(self.phase_covers):
+                if len(cover) != DOY_LEN:
+                    raise ValueError(
+                        f"phase_covers[{i}] must be length {DOY_LEN}, got {len(cover)}"
+                    )
+        if self.phase_labels is not None:
+            n = len(self.phase_covers or [])
+            if len(self.phase_labels) != n:
+                raise ValueError(
+                    f"phase_labels has {len(self.phase_labels)} entries but "
+                    f"phase_covers has {n}. Mislabelled phases would caption "
+                    f"'bare after corn' with the soybean number."
+                )
 
 
 def placeholder_imagery() -> ImageryInputs:
@@ -192,6 +210,7 @@ def placeholder_imagery() -> ImageryInputs:
             [max(g, r) for g, r in zip(corn_g, corn_r)],
             [max(g, r) for g, r in zip(soy_g, soy_r)],
         ],
+        phase_labels=["corn", "soybean"],
     )
 
 
@@ -219,14 +238,26 @@ def assemble(
     soil_cover = [
         max(g, r) for g, r in zip(imagery.green_cover, imagery.residue_cover)
     ]
-    gaps = build_gaps(soil_cover, erosivity.per_doy_r)
+    gaps = build_gaps(
+        soil_cover, erosivity.per_doy_r, phase_covers=imagery.phase_covers
+    )
     species = load_species(species_csv or DATA_DIR / "species.csv")
+
+    # Nothing can be drilled into a field with a crop still standing on it.
+    # Without this the model seeded cereal rye on 15 Aug -- six weeks before
+    # this field's observed 29 Sep harvest -- and credited it a full autumn
+    # of growth it could never have had.
+    harvests = sorted(
+        y.harvest_doy for y in imagery.observed_years if y.harvest_doy is not None
+    )
+    earliest_seed = harvests[len(harvests) // 2] if harvests else None
 
     observed_curves = {k: v.green_cover for k, v in imagery.crop_curves.items()}
     rotations = build_standard_rotations(
         soil_cover, species, erosivity.per_doy_r,
         weather.gdd_base4, weather.gdd_base10, weather.frost_prob, soil_moisture,
         observed_curves, phase_covers=imagery.phase_covers,
+        earliest_seed_doy=earliest_seed,
     )
 
     sources = [nasa_source("power", n_obs=len(records)), *imagery.sources]
@@ -290,9 +321,12 @@ def assemble(
             frost_prob=weather.frost_prob,
             heat_stress_prob=weather.heat_stress_prob,
             soil_moisture=soil_moisture,
+            phase_covers=imagery.phase_covers,
         ),
         observed_rotation=ObservedRotation(
-            years=imagery.observed_years, inferred_label=imagery.inferred_label
+            years=imagery.observed_years,
+            inferred_label=imagery.inferred_label,
+            phase_labels=imagery.phase_labels,
         ),
         gaps=gaps,
         crop_curves=imagery.crop_curves,

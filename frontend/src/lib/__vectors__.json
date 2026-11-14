@@ -2491,8 +2491,8 @@
   "candidate_seed_doys": [
    {
     "species_id": "cereal_rye",
-    "expect_count": 80,
-    "expect_first": 240,
+    "expect_count": 93,
+    "expect_first": 227,
     "expect_last": 319
    },
    {
@@ -2503,8 +2503,8 @@
    },
    {
     "species_id": "hairy_vetch",
-    "expect_count": 19,
-    "expect_first": 240,
+    "expect_count": 46,
+    "expect_first": 213,
     "expect_last": 258
    },
    {
@@ -2523,10 +2523,10 @@
   "thermal_ramp_curve": [
    {
     "species_id": "cereal_rye",
-    "seed_doy": 240,
-    "expect_sum": 139.7393,
+    "seed_doy": 227,
+    "expect_sum": 147.2675,
     "expect_max": 0.55,
-    "expect_nonzero_days": 266
+    "expect_nonzero_days": 279
    },
    {
     "species_id": "forage_radish",
@@ -2537,10 +2537,10 @@
    },
    {
     "species_id": "hairy_vetch",
-    "seed_doy": 240,
-    "expect_sum": 137.9218,
+    "seed_doy": 213,
+    "expect_sum": 153.7648,
     "expect_max": 0.55,
-    "expect_nonzero_days": 266
+    "expect_nonzero_days": 293
    },
    {
     "species_id": "oats",
@@ -2554,8 +2554,8 @@
    {
     "species_id": "cereal_rye",
     "expect_feasible": true,
-    "expect_seed_doy": 240,
-    "expect_gdd_available": 1133.9141,
+    "expect_seed_doy": 227,
+    "expect_gdd_available": 1367.1658,
     "expect_delta_exposed_r": 443.9812,
     "expect_pct_reduction": 68.0783,
     "expect_curve_source": "modelled"
@@ -2572,8 +2572,8 @@
    {
     "species_id": "hairy_vetch",
     "expect_feasible": true,
-    "expect_seed_doy": 240,
-    "expect_gdd_available": 1133.9141,
+    "expect_seed_doy": 213,
+    "expect_gdd_available": 1639.8392,
     "expect_delta_exposed_r": 443.9812,
     "expect_pct_reduction": 68.0783,
     "expect_curve_source": "modelled"

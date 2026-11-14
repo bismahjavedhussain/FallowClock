@@ -38,7 +38,7 @@
     }
   },
   "provenance": {
-    "generated_at": "2026-11-14T08:04:59.172317Z",
+    "generated_at": "2026-11-14T11:31:22.369586Z",
     "years_used": [
       2017,
       2018,
@@ -4466,7 +4466,8 @@
       0.2485,
       0.25,
       0.2515
-    ]
+    ],
+    "phase_covers": null
   },
   "observed_rotation": {
     "years": [
@@ -4543,7 +4544,8 @@
         "cover_crop_detected": false
       }
     ],
-    "inferred_label": "Corn-Soybean, no cover crop"
+    "inferred_label": "Corn-Soybean, no cover crop",
+    "phase_labels": null
   },
   "gaps": [
     {
@@ -6264,6 +6266,7 @@
         0.16599999999999987
       ],
       "bare_days": 223,
+      "bare_days_by_phase": null,
       "exposed_r": 1158.2085322225207,
       "delta_vs_current_pct": 0.0,
       "added_seed_cost_usd_ha": 0.0,
@@ -6647,6 +6650,7 @@
         0.45
       ],
       "bare_days": 50,
+      "bare_days_by_phase": null,
       "exposed_r": 707.1973023562427,
       "delta_vs_current_pct": -38.94041680048922,
       "added_seed_cost_usd_ha": 62.0,
@@ -7030,6 +7034,7 @@
         0.55
       ],
       "bare_days": 0,
+      "bare_days_by_phase": null,
       "exposed_r": 266.0263840056292,
       "delta_vs_current_pct": -77.0312187654892,
       "added_seed_cost_usd_ha": 138.0,

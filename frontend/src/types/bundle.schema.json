@@ -121,6 +121,27 @@
           "minItems": 365,
           "title": "Soil Moisture",
           "type": "array"
+        },
+        "phase_covers": {
+          "anyOf": [
+            {
+              "items": {
+                "items": {
+                  "type": "number"
+                },
+                "maxItems": 365,
+                "minItems": 365,
+                "type": "array"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "One soil_cover curve per rotation phase, ordered as observed_rotation.phase_labels. soil_cover is their MEAN, which is a curve no real year followed: a day can be covered on the mean and bare in half the actual years. gaps[] is built from these, not from soil_cover. None when the rotation has only one phase.",
+          "title": "Phase Covers"
         }
       },
       "required": [
@@ -302,6 +323,22 @@
           "description": "e.g. 'Corn-Soybean, no cover'",
           "title": "Inferred Label",
           "type": "string"
+        },
+        "phase_labels": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Crop phase of the rotation, e.g. ['soybean', 'corn']. Indexes line up with Rotation.bare_days_by_phase. None when the rotation could not be split into phases.",
+          "title": "Phase Labels"
         }
       },
       "required": [
@@ -459,10 +496,27 @@
           "type": "array"
         },
         "bare_days": {
+          "description": "Expected bare days in a randomly chosen year. When the rotation has phases this is the mean of bare_days_by_phase, NOT the bare days of the mean cover curve -- see gaps.phase_averaged_bare_days for why those differ and why the difference does not have a predictable sign.",
           "maximum": 365,
           "minimum": 0,
           "title": "Bare Days",
           "type": "integer"
+        },
+        "bare_days_by_phase": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "integer"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Bare days in each phase, ordered as observed_rotation.phase_labels. A corn-soybean field is bare for different stretches after corn than after soybeans; the mean hides that, so show both.",
+          "title": "Bare Days By Phase"
         },
         "exposed_r": {
           "minimum": 0,

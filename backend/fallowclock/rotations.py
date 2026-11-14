@@ -21,6 +21,7 @@ from .gaps import (
     build_gaps,
     exposed_erosivity,
     phase_averaged_exposed_erosivity,
+    phase_bare_days,
 )
 from .schema import DOY_LEN, Gap, Rotation, Species
 
@@ -69,8 +70,15 @@ def score_rotation(
             for p in phase_covers
         ]
         exposed = phase_averaged_exposed_erosivity(combined_phases, erosivity_r, b)
+        # Same correction for the bare-day count. `cover` is the mean curve,
+        # and thresholding a mean is not the mean of the thresholds -- it
+        # hides a bare window that exists in one phase and not the other.
+        by_phase = phase_bare_days(combined_phases)
+        n_bare = round(sum(by_phase) / len(by_phase))
     else:
         exposed = exposed_erosivity(cover, erosivity_r, b)
+        by_phase = None
+        n_bare = bare_days(cover)
 
     return Rotation(
         id=plan.id,
@@ -78,7 +86,8 @@ def score_rotation(
         sequence=plan.sequence,
         is_current=plan.is_current,
         soil_cover=cover,
-        bare_days=bare_days(cover),
+        bare_days=n_bare,
+        bare_days_by_phase=by_phase,
         exposed_r=exposed,
         delta_vs_current_pct=0.0,  # filled by compare()
         added_seed_cost_usd_ha=sum(f.seed_cost_usd_ha for f in fills),
@@ -123,6 +132,7 @@ def best_fills_for_gaps(
     allowed_species: list[str] | None = None,
     max_gaps: int = 2,
     b: float = RUSLE_B_DEFAULT,
+    earliest_seed_doy: int | None = None,
 ) -> list[FitResult]:
     """Pick the best feasible species for each of the biggest gaps.
 
@@ -143,6 +153,7 @@ def best_fills_for_gaps(
         ranked = rank_species_for_gap(
             pool, gap, gdd_base4, gdd_base10, frost_prob, soil_moisture,
             erosivity_r, running_cover, observed_curves, b,
+            earliest_seed_doy=earliest_seed_doy,
         )
         feasible = [r for r in ranked if r.feasible and r.delta_exposed_r > 0]
         if not feasible:
@@ -169,6 +180,7 @@ def build_standard_rotations(
     *,
     phase_covers: list[list[float]] | None = None,
     b: float = RUSLE_B_DEFAULT,
+    earliest_seed_doy: int | None = None,
 ) -> list[Rotation]:
     """The three rotations the brief asks us to compare, for the Corn Belt.
 
@@ -180,16 +192,18 @@ def build_standard_rotations(
     most likely to actually make, and showing the realistic option beside
     the ambitious one is more useful than showing only the best case.
     """
-    gaps = build_gaps(base_cover, erosivity_r, b=b)
+    gaps = build_gaps(base_cover, erosivity_r, b=b, phase_covers=phase_covers)
 
     args = (base_cover, gdd_base4, gdd_base10, frost_prob, soil_moisture, erosivity_r)
 
     rye_fills = best_fills_for_gaps(
         species, gaps, *args, observed_curves,
         allowed_species=["cereal_rye"], max_gaps=1, b=b,
+        earliest_seed_doy=earliest_seed_doy,
     )
     best_fills = best_fills_for_gaps(
         species, gaps, *args, observed_curves, max_gaps=2, b=b,
+        earliest_seed_doy=earliest_seed_doy,
     )
 
     plans = [

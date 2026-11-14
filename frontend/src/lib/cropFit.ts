@@ -38,6 +38,21 @@ export const MIN_SEEDING_MOISTURE = 0.15
  */
 export const PRE_GAP_SEEDING_DAYS = 60
 
+/**
+ * A winter-hardy cover crop is seeded in autumn precisely so that it is
+ * standing the FOLLOWING spring, and on a reduced-tillage field the spring
+ * window is the one that matters: Story County's residue mat holds cover
+ * above the bare threshold all winter, then thins after planting, leaving
+ * the field bare DOY 83-165 — straight through the DOY 170 erosivity peak.
+ *
+ * With a flat 60-day lead, cereal rye's seeding window (DOY 227-319) misses
+ * that gap by four months and every winter-hardy species comes back
+ * "seeding window does not overlap this gap".
+ *
+ * Mirrors WINTER_HARDY_PRE_GAP_DAYS in backend/fallowclock/cropfit.py.
+ */
+export const WINTER_HARDY_PRE_GAP_DAYS = 300
+
 /** Frost-killed residue decomposes: roughly halves over a winter, floors at
  *  a persistent mat. Without this every species scores identically. */
 export const RESIDUE_DECAY_PER_DAY = 0.006
@@ -172,10 +187,19 @@ export function candidateSeedDoys(
   preGapDays = PRE_GAP_SEEDING_DAYS,
   earliestSeedDoy?: number,
 ): number[] {
-  const startIdx =
-    earliestSeedDoy !== undefined
-      ? earliestSeedDoy - 1
-      : (((gap.start_doy - 1 - preGapDays) % DOY_LEN) + DOY_LEN) % DOY_LEN
+  let startIdx: number
+  if (earliestSeedDoy !== undefined) {
+    startIdx = earliestSeedDoy - 1
+  } else {
+    let lead = species.winter_hardy
+      ? Math.max(preGapDays, WINTER_HARDY_PRE_GAP_DAYS)
+      : preGapDays
+    // The seeding period is lead + gap and must not exceed a year. Without
+    // this cap it wraps PAST itself and doysInRun returns the complement —
+    // the window the species may NOT be seeded in.
+    lead = Math.max(0, Math.min(lead, DOY_LEN - gap.n_days))
+    startIdx = (((gap.start_doy - 1 - lead) % DOY_LEN) + DOY_LEN) % DOY_LEN
+  }
   return doysInRun(startIdx, gap.end_doy - 1)
     .map((i) => i + 1)
     .filter((d) => inWindow(d, species.seeding_window))
@@ -255,9 +279,15 @@ export function fitSpeciesInGap(
   clim: ClimatologySlice,
   observedCurve?: number[],
   b = RUSLE_B_DEFAULT,
+  earliestSeedDoy?: number,
 ): FitResult {
   const gddDaily = species.tbase_c >= 10 ? clim.gddBase10 : clim.gddBase4
-  const candidates = candidateSeedDoys(species, gap)
+  const candidates = candidateSeedDoys(
+    species,
+    gap,
+    PRE_GAP_SEEDING_DAYS,
+    earliestSeedDoy,
+  )
 
   const base = (over: Partial<FitResult>): FitResult => ({
     speciesId: species.id,
@@ -367,9 +397,13 @@ export function rankSpeciesForGap(
   clim: ClimatologySlice,
   observedCurves: Record<string, number[]> = {},
   b = RUSLE_B_DEFAULT,
+  /** Observed cash-crop harvest: nothing is drilled into a standing crop. */
+  earliestSeedDoy?: number,
 ): FitResult[] {
   return speciesList
-    .map((sp) => fitSpeciesInGap(sp, gap, clim, observedCurves[sp.id], b))
+    .map((sp) =>
+      fitSpeciesInGap(sp, gap, clim, observedCurves[sp.id], b, earliestSeedDoy),
+    )
     // Feasible first, then EVIDENCE TIER, then benefit. Evidence outranks
     // magnitude deliberately: a modelled thermal ramp often out-scores a
     // species we have a real curve for, because the model is a smooth

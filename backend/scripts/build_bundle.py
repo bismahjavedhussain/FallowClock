@@ -20,13 +20,15 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from fallowclock.bundle import build_for_farm  # noqa: E402
+from fallowclock.bundle import ImageryInputs, build_for_farm  # noqa: E402
 from fallowclock.erosivity import peak_doy, peak_window_doy  # noqa: E402
-from fallowclock.schema import Farm, write_bundle  # noqa: E402
+from fallowclock.imagery import load_imagery, uncertainty_notes  # noqa: E402
+from fallowclock.schema import Bundle, Farm, Uncertainty, write_bundle  # noqa: E402
 from fallowclock.sources import check_eligibility  # noqa: E402
 from fallowclock.weather import fetch_daily, frost_date_stats  # noqa: E402
 
 OUT_DIR = Path(__file__).resolve().parents[2] / "frontend" / "public" / "bundles"
+IMAGERY_DIR = Path(__file__).resolve().parents[1] / "data" / "imagery"
 
 # A real place, named. "Farmers worldwide" appears nowhere in six years of
 # Space Apps global winners; every one of them named a user and a location.
@@ -37,17 +39,19 @@ FARMS: dict[str, Farm] = {
         id="story-county-ia",
         owner_name="TBD -- U2 to name a real farmer",
         place="Story County, Iowa",
-        centroid=(-93.62, 42.03),
-        area_ha=64.7,
+        # 5 km NE of Ames. CDL 2014-2021 strict corn-soybean alternation;
+        # 2022 corn, 2023 soy, 2024 corn, 2025 soy.
+        centroid=(-93.564724, 42.050523),
+        area_ha=39.3,
         polygon_geojson={
             "type": "Polygon",
             "coordinates": [
                 [
-                    [-93.628, 42.026],
-                    [-93.613, 42.026],
-                    [-93.613, 42.035],
-                    [-93.628, 42.035],
-                    [-93.628, 42.026],
+                    [-93.568168, 42.04742],
+                    [-93.561279, 42.04742],
+                    [-93.561279, 42.053626],
+                    [-93.568168, 42.053626],
+                    [-93.568168, 42.04742],
                 ]
             ],
         },
@@ -56,17 +60,19 @@ FARMS: dict[str, Farm] = {
         id="monona-county-ia",
         owner_name="TBD -- second farm, Loess Hills",
         place="Monona County, Iowa (Loess Hills)",
-        centroid=(-95.95, 42.05),
-        area_ha=48.2,
+        # Loess Hills, 1.4 km from the original point. CDL 2014-2021
+        # soybean-corn alternation; 2022 soy, 2023 corn, 2024 soy, 2025 corn.
+        centroid=(-95.933558, 42.05),
+        area_ha=14.9,
         polygon_geojson={
             "type": "Polygon",
             "coordinates": [
                 [
-                    [-95.957, 42.046],
-                    [-95.944, 42.046],
-                    [-95.944, 42.054],
-                    [-95.957, 42.054],
-                    [-95.957, 42.046],
+                    [-95.936282, 42.048516],
+                    [-95.930833, 42.048516],
+                    [-95.930833, 42.051484],
+                    [-95.936282, 42.051484],
+                    [-95.936282, 42.048516],
                 ]
             ],
         },
@@ -74,7 +80,37 @@ FARMS: dict[str, Farm] = {
 }
 
 
-def report(farm: Farm, bundle, path: Path) -> list[str]:
+def imagery_for(farm_id: str) -> tuple[ImageryInputs | None, dict | None]:
+    """B1's frozen satellite cover for a farm, or (None, None).
+
+    Returning None rather than raising is deliberate: a teammate who has
+    just cloned and wants to see the pipeline run should get a bundle with
+    the synthetic banner on it, not an exception.
+    """
+    path = IMAGERY_DIR / f"{farm_id}.json"
+    if not path.exists():
+        return None, None
+    imagery, report = load_imagery(path)
+    # The report's `phases` is ordered the same way phase_covers is (most
+    # observations first), so it names them. Only attach the labels if the
+    # counts agree -- a wrong label is worse than no label.
+    labels = list((report.get("phases") or {}).keys())
+    if imagery.phase_covers and len(labels) == len(imagery.phase_covers):
+        imagery.phase_labels = labels
+    return imagery, report
+
+
+def with_imagery_notes(bundle: Bundle, rep: dict) -> Bundle:
+    """Append B1's imagery caveats. Re-running this script must not quietly
+    drop them -- they are the honesty half of the bundle."""
+    payload = bundle.model_dump(mode="json")
+    payload["uncertainty"] = payload["uncertainty"] + [
+        Uncertainty(**n).model_dump(mode="json") for n in uncertainty_notes(rep)
+    ]
+    return Bundle.model_validate(payload)
+
+
+def report(farm: Farm, bundle, path: Path, rep: dict | None = None) -> list[str]:
     """Print the numbers, and return any sanity checks that failed."""
     c = bundle.climatology
     bare = sum(1 for v in c.soil_cover if v < 0.30)
@@ -86,7 +122,21 @@ def report(farm: Farm, bundle, path: Path) -> list[str]:
     print(f"  -> {path.name}  ({path.stat().st_size // 1024} KB)")
     print(f"  years            : {bundle.provenance.years_used[0]}"
           f"-{bundle.provenance.years_used[-1]}")
-    print(f"  bare days        : {bare}")
+    cur = next((r for r in bundle.rotations if r.is_current), None)
+    labels = bundle.observed_rotation.phase_labels
+    if cur is not None and cur.bare_days_by_phase:
+        split = ", ".join(
+            f"{n}d after {lab}"
+            for n, lab in zip(cur.bare_days_by_phase, labels or ["phase"] * 9)
+        )
+        print(f"  bare days        : {cur.bare_days} expected/yr ({split})"
+              f"   [mean-cover curve alone reads {bare}]")
+    else:
+        print(f"  bare days        : {bare}")
+    if rep:
+        lo, hi = rep.get("bare_days_more_residue"), rep.get("bare_days_less_residue")
+        if lo is not None and hi is not None:
+            print(f"  bare-day band    : {lo}-{hi} for a +-0.02 NDTI endmember shift")
     print(f"  peak erosivity   : DOY {pk_win} (30-day window); single-day max DOY {pk}")
     print(f"  annual R         : {sum(c.erosivity_r):,.0f} MJ.mm/ha/h")
     if biggest:
@@ -99,8 +149,19 @@ def report(farm: Farm, bundle, path: Path) -> list[str]:
 
     # Sanity checks from the plan's verification section.
     problems = []
+    till = (rep or {}).get("tillage") or {}
     if not 120 <= bare <= 240:
-        problems.append(f"bare days {bare} outside the plausible 120-240 for corn-soy")
+        # The 120-240 range describes a CONVENTIONALLY TILLED corn-soy field.
+        # A field whose own residue puts it in the NRCS reduced- or
+        # conservation-tillage class is supposed to have fewer bare days, so
+        # on those fields this is a finding to report, not a check to fail.
+        if till.get("label") in ("reduced tillage", "conservation tillage"):
+            print(f"  NOTE             : {bare} bare days is below the 120-240 range for a "
+                  f"conventionally tilled field, but this one reads "
+                  f"{till['post_planting_residue_median']*100:.0f}% residue after planting "
+                  f"(n={till['n']}): NRCS {till['label']}, so few bare days is the finding")
+        else:
+            problems.append(f"bare days {bare} outside the plausible 120-240 for corn-soy")
     if not 91 <= pk_win <= 212:
         problems.append(f"erosivity peak window centres on DOY {pk_win}; Iowa "
                         "should be Apr-Jul (a January peak means a "
@@ -137,12 +198,19 @@ def main() -> int:
     all_problems: list[str] = []
 
     for farm in targets:
+        imagery, rep = imagery_for(farm.id)
+        if imagery is None:
+            print()
+            print(f"[{farm.id}] no data/imagery/{farm.id}.json -- falling back to "
+                  "SYNTHETIC cover curves. Run scripts/build_imagery.py for real ones.")
         bundle = build_for_farm(
-            farm, start_year=args.start_year, end_year=args.end_year
+            farm, start_year=args.start_year, end_year=args.end_year, imagery=imagery
         )
+        if rep is not None:
+            bundle = with_imagery_notes(bundle, rep)
         path = OUT_DIR / f"farm_{farm.id}.json"
         write_bundle(bundle, str(path))
-        all_problems += [f"{farm.id}: {p}" for p in report(farm, bundle, path)]
+        all_problems += [f"{farm.id}: {p}" for p in report(farm, bundle, path, rep)]
 
         fd = frost_date_stats(
             fetch_daily(farm.centroid[1], farm.centroid[0], args.start_year, args.end_year)
