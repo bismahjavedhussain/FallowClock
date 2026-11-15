@@ -60,3 +60,31 @@ describe('ResponsiveLayout - LegendFlyout Trigger Markup', () => {
     expect(html).toContain('How to read the wheel')
   })
 })
+
+describe('ResponsiveLayout - Field Summary Card Resilience', () => {
+  it('renders field summary card with bare days and erosivity overlap elements', () => {
+    const html = renderToStaticMarkup(
+      <aside className="pane-side">
+        <div className="field-summary" aria-label="Field overview">
+          <div>
+            <span className="eyebrow">From this field</span>
+            <strong>104 <small>days</small></strong>
+            <p>of bare soil expected per year</p>
+          </div>
+          <div>
+            <span className="eyebrow">Erosivity overlap</span>
+            <strong>62<small>%</small></strong>
+            <p>of annual erosivity overlaps the largest bare gap</p>
+          </div>
+        </div>
+      </aside>
+    )
+
+    expect(html).toContain('class="field-summary"')
+    expect(html).toContain('aria-label="Field overview"')
+    expect(html).toContain('From this field')
+    expect(html).toContain('104 <small>days</small>')
+    expect(html).toContain('Erosivity overlap')
+    expect(html).toContain('62<small>%</small>')
+  })
+})

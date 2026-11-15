@@ -91,3 +91,19 @@
 /* --- Title card: epigraph and team credit ----------------------------- */
 .enter-card .enter-epigraph { margin: -14px 0 24px; color: #a9c8b3; font: 13px/1.5 Georgia, serif; font-style: italic; }
 .enter-card .enter-credit { margin-top: 18px; color: #7fa38b; letter-spacing: .14em; text-transform: uppercase; font-size: 10px; }
+
+/* --- Act one: field summary resilience -------------------------------- */
+/* Prevent flexbox from collapsing the field summary card in the sidebar.
+   Keeps the bare days count and erosivity overlap metrics fully visible. */
+.pane-side .field-summary {
+  flex: none !important;
+  flex-shrink: 0 !important;
+  min-height: -moz-fit-content !important;
+  min-height: fit-content !important;
+  overflow: visible !important;
+}
+.pane-side .field-summary strong {
+  display: block !important;
+  color: #ffffff !important;
+}
+

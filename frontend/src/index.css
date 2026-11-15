@@ -752,6 +752,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
    length depends on the data, and clipping a species off the bottom would
    hide information rather than tidy it. */
 .pane-side { overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
+.pane-side > * { flex-shrink: 0; }
 .pane-main > .hero-world { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
 .pane-main > .hero-world > [role='region'] { max-height: 100%; }
 .pane-main .soil-cutaway { flex: 1; min-height: 0; display: flex; align-items: center; }
@@ -819,6 +820,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   .act-pane { min-height: 100%; height: auto; overflow: visible; padding: 12px clamp(10px, 2.5vw, 24px) calc(var(--bottom-bar) + 20px); box-sizing: border-box; }
   .pane-grid { grid-template-columns: 1fr; gap: 16px; }
   .pane-side { overflow: visible; }
+  .pane-side .field-summary { position: relative; top: auto; }
   .pane-futures .rotation-list { grid-template-columns: 1fr; }
   .site-shell.is-deck .deck-nav {
     position: absolute;
@@ -1074,14 +1076,25 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 /* The base .field-summary is a 200px-tall hero block from the old
    full-width header. In a 300px rail that squeezed the eyebrow against
    the top edge and clipped it. Here it is a compact two-up card. */
-.pane-side .field-summary { min-height: 0; padding: 13px 15px; border-radius: 15px; display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pane-side .field-summary {
+  flex: none;
+  min-height: -moz-fit-content;
+  min-height: fit-content;
+  padding: 13px 15px;
+  border-radius: 15px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  overflow: visible;
+  box-sizing: border-box;
+}
 .pane-side .field-summary::after { display: none; }
-.pane-side .field-summary > div { min-width: 0; }
-.pane-side .field-summary .eyebrow { display: block; margin-bottom: 2px; font-size: 9px; letter-spacing: .1em; line-height: 1.5; }
-.pane-side .field-summary strong { margin-top: 0; font-size: 27px; line-height: 1.05; }
-.pane-side .field-summary strong small { font-size: 13px; }
-.pane-side .field-summary p { margin-top: 3px; max-width: none; font-size: 10.5px; line-height: 1.35; }
-/* Keep the headline figures in view while the packet list scrolls. */
+.pane-side .field-summary > div { min-width: 0; display: flex; flex-direction: column; }
+.pane-side .field-summary .eyebrow { display: block; margin-bottom: 2px; font-size: 9px; letter-spacing: .1em; line-height: 1.5; color: #d7e8ce; text-transform: uppercase; }
+.pane-side .field-summary strong { margin-top: 0; font: 700 27px/1.05 Georgia, serif; color: #ffffff; display: block; }
+.pane-side .field-summary strong small { font-size: 13px; color: #d7e8ce; font-weight: 500; margin-left: 2px; }
+.pane-side .field-summary p { margin-top: 3px; margin-bottom: 0; max-width: none; font-size: 10.5px; line-height: 1.35; color: #e5f1e2; }
+/* Keep the headline figures in view while the packet list scrolls on desktop. */
 .pane-side .field-summary { position: sticky; top: 0; z-index: 2; }
 
 /* ======================================================================
