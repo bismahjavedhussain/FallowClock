@@ -75,6 +75,45 @@ export default function SlideDeck({
     return () => window.removeEventListener('keydown', onKey)
   }, [go, index, slides.length])
 
+  // Touch swipe support across acts for mobile and tablet touch devices
+  const touchStartX = useRef<number | null>(null)
+  const touchStartY = useRef<number | null>(null)
+
+  const onTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement | null
+    if (
+      target?.closest('canvas') ||
+      target?.closest('input') ||
+      target?.closest('button') ||
+      target?.closest('.year-ring-stage-3d') ||
+      target?.closest('.time-lever') ||
+      target?.closest('.seed-packet') ||
+      target?.closest('[draggable="true"]')
+    ) {
+      touchStartX.current = null
+      touchStartY.current = null
+      return
+    }
+    if (e.touches.length === 1) {
+      touchStartX.current = e.touches[0].clientX
+      touchStartY.current = e.touches[0].clientY
+    }
+  }
+
+  const onTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartX.current == null || touchStartY.current == null) return
+    const dx = e.changedTouches[0].clientX - touchStartX.current
+    const dy = e.changedTouches[0].clientY - touchStartY.current
+    touchStartX.current = null
+    touchStartY.current = null
+
+    // If swipe is primarily horizontal and reaches threshold, navigate
+    if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      if (dx < 0) go(index + 1)
+      else go(index - 1)
+    }
+  }
+
   // A slide the user tabs into must be the slide they can see.
   useEffect(() => {
     const node = deck.current
@@ -90,7 +129,7 @@ export default function SlideDeck({
   }, [go, index])
 
   return (
-    <div className="deck" ref={deck}>
+    <div className="deck" ref={deck} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
       <div
         className="deck-track"
         style={{ transform: `translate3d(-${index * 100}%, 0, 0)` }}

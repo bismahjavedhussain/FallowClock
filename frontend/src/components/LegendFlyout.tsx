@@ -51,12 +51,15 @@ export default function LegendFlyout({
       </button>
 
       {open && createPortal(
-        <div className="legend-flyout" ref={panel} tabIndex={-1} role="dialog" aria-label="How to read the wheel">
-          <button type="button" className="legend-close" onClick={onClose} aria-label="Close the key">
-            ×
-          </button>
-          <RingLegend compact showDetails />
-        </div>,
+        <>
+          <div className="legend-backdrop" onClick={onClose} aria-hidden="true" />
+          <div className="legend-flyout" ref={panel} tabIndex={-1} role="dialog" aria-label="How to read the wheel">
+            <button type="button" className="legend-close" onClick={onClose} aria-label="Close the key">
+              ×
+            </button>
+            <RingLegend compact showDetails />
+          </div>
+        </>,
         document.body,
       )}
     </>

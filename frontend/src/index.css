@@ -806,19 +806,36 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .deck-arrow:disabled { opacity: .3; cursor: default; }
 .deck-nav button:focus-visible, .deck-arrow:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
 
-/* Phones get an ordinary scrolling column. A locked viewport on a small
-   screen hides content and breaks assistive scrolling, and none of these
-   panes fit in 650px of height anyway. */
-@media (max-width: 900px), (max-height: 620px) {
-  .site-shell.is-deck { height: auto; overflow: visible; }
-  .deck, .deck-slide { overflow: visible; height: auto; }
-  .deck-track { display: block; transform: none !important; }
-  .deck-slide { width: 100%; }
-  .act-pane { height: auto; overflow: visible; padding-bottom: 26px; }
-  .pane-grid { grid-template-columns: 1fr; }
+/* Responsive Slide Deck Container:
+   Maintains intentional horizontal act paging across Desktop, Tablet and Mobile,
+   while allowing internal vertical scrolling within individual act panes so
+   no interactive elements or data are ever clipped or trapped. */
+@media (max-width: 1023px) {
+  :root { --farmer-lane: 0px; --bottom-bar: 64px; }
+  .site-shell.is-deck { height: 100dvh; min-height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
+  .deck { position: relative; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+  .deck-track { display: flex; height: 100%; width: 100%; will-change: transform; flex: 1; min-height: 0; }
+  .deck-slide { flex: 0 0 100%; width: 100%; height: 100%; min-width: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
+  .act-pane { min-height: 100%; height: auto; overflow: visible; padding: 12px clamp(10px, 2.5vw, 24px) calc(var(--bottom-bar) + 20px); box-sizing: border-box; }
+  .pane-grid { grid-template-columns: 1fr; gap: 16px; }
   .pane-side { overflow: visible; }
   .pane-futures .rotation-list { grid-template-columns: 1fr; }
-  .deck-nav { position: sticky; bottom: 0; }
+  .site-shell.is-deck .deck-nav {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    height: var(--bottom-bar);
+    padding: 8px clamp(10px, 3vw, 20px) max(8px, env(safe-area-inset-bottom));
+    background: #061710ee;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-top: 1px solid var(--deck-edge);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
 }
 
 /* ======================================================================
@@ -925,11 +942,131 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .deck-next-chev { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: #ffffff26; font-size: 18px; animation: next-nudge 1.9s ease-in-out infinite; }
 @keyframes next-nudge { 0%, 100% { transform: translateX(0) } 50% { transform: translateX(4px) } }
 
-@media (max-width: 900px), (max-height: 620px) {
-  .deck-nav { position: sticky; bottom: 0; height: auto; padding: 8px 14px; }
-  .farmer-guide { display: none; }
-  .pane-desk { padding-bottom: 26px; }
-  .deck-next { position: static; width: 100%; margin: 10px 0 0; justify-content: center; }
+@media (max-width: 1023px) {
+  .farmer-guide {
+    position: fixed;
+    left: 10px;
+    bottom: calc(var(--bottom-bar) + 10px);
+    width: auto;
+    height: auto;
+    z-index: 28;
+    display: flex;
+    flex-direction: row;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 0;
+    pointer-events: none;
+  }
+  .farmer-guide > * {
+    pointer-events: auto;
+  }
+  .farmer-sprite, .farmer-sprite img {
+    width: 52px;
+    height: 52px;
+  }
+  .farmer-shadow {
+    bottom: 2px;
+    width: 26px;
+    height: 4px;
+    margin-left: -13px;
+  }
+  .farmer-bubble {
+    position: relative;
+    max-width: min(280px, calc(100vw - 84px));
+    margin-bottom: 6px;
+    padding: 6px 24px 6px 10px;
+    border-width: 2px;
+    border-radius: 6px;
+    background: #fffdf2;
+    box-shadow: 0 6px 18px #0000004d;
+  }
+  .farmer-bubble p {
+    font-size: 11.5px;
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .farmer-bubble::before {
+    left: -7px;
+    right: auto;
+    bottom: 12px;
+    width: 8px;
+    height: 8px;
+    transform: rotate(45deg);
+    border-left: 2px solid #2f4435;
+    border-bottom: 2px solid #2f4435;
+    border-right: 0;
+    border-top: 0;
+  }
+  .farmer-bubble-close {
+    top: 3px;
+    right: 4px;
+    width: 16px;
+    height: 16px;
+    font-size: 13px;
+  }
+  .deck-next {
+    min-height: 38px;
+    padding: 0 8px 0 14px;
+    gap: 8px;
+  }
+  .deck-next-label {
+    font-size: 12px;
+  }
+  .deck-next-label small {
+    font-size: 8.5px;
+  }
+  .deck-next-chev {
+    width: 26px;
+    height: 26px;
+    font-size: 16px;
+  }
+}
+@media (max-width: 640px) {
+  :root { --bottom-bar: 56px; }
+  .deck-nav ol button {
+    padding: 0 8px;
+    min-height: 36px;
+  }
+  .deck-nav ol button .deck-name {
+    display: none;
+  }
+  .deck-nav ol button.is-on .deck-name {
+    display: inline-block;
+    font-size: 11px;
+    margin-left: 2px;
+  }
+  .deck-nav ol button.is-on {
+    padding: 0 10px;
+  }
+  .deck-arrow {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+  .deck-next {
+    min-height: 36px;
+    padding: 0 8px;
+  }
+  .deck-next-label small {
+    display: none;
+  }
+  .deck-next-label {
+    font-size: 11px;
+  }
+  .farmer-guide {
+    left: 6px;
+    bottom: calc(var(--bottom-bar) + 6px);
+  }
+  .farmer-sprite, .farmer-sprite img {
+    width: 44px;
+    height: 44px;
+  }
+  .farmer-bubble {
+    max-width: min(230px, calc(100vw - 64px));
+  }
 }
 
 
@@ -1193,6 +1330,94 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .pane-crisis .hero-world [role='region'] { width: 100%; max-height: 100%; }
 .pane-crisis .hero-world [role='region'] > div:last-child { max-height: 100%; }
 
+/* --- active candidate rotation banner in Act 1 ---------------------- */
+.rotation-preview-banner {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  width: max-content;
+  max-width: min(580px, calc(100% - 24px));
+  padding: 6px 12px;
+  border: 1px solid #c9a756;
+  border-radius: 999px;
+  background: #0f2a1ff2;
+  color: #f7fbf3;
+  box-shadow: 0 8px 24px #00000066;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: notes-fade .24s ease both;
+}
+.preview-tag {
+  flex: none;
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: #f0cf87;
+  color: #24351b;
+  font: 700 9px/1 system-ui;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.preview-label {
+  flex: 1;
+  min-width: 0;
+  font: 600 11.5px/1.25 system-ui;
+  color: #eaf6ee;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.preview-label strong {
+  color: #fff7de;
+}
+.preview-reset {
+  flex: none;
+  min-height: 26px;
+  padding: 0 10px;
+  border: 1px solid #ffffff47;
+  border-radius: 999px;
+  background: #ffffff1f;
+  color: #eaf6ef;
+  font: 600 10.5px/1 system-ui;
+  cursor: pointer;
+  transition: background .18s, color .18s, border-color .18s;
+}
+.preview-reset:hover {
+  background: #f0cf87;
+  border-color: #f0cf87;
+  color: #24351b;
+}
+.preview-reset:focus-visible {
+  outline: 2px solid #f0cf87;
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .rotation-preview-banner {
+    top: 8px;
+    width: calc(100% - 16px);
+    max-width: none;
+    border-radius: 12px;
+    padding: 7px 10px;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .preview-label {
+    width: 100%;
+    order: 3;
+    white-space: normal;
+    font-size: 11px;
+  }
+  .preview-reset {
+    margin-left: auto;
+  }
+}
+
 /* --- phase pills, sitting on the dial -------------------------------- */
 .phase-pills { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; gap: 4px; padding: 4px; border-radius: 999px; border: 1px solid #ffffff5c; background: #0f2a1fb8; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
 .phase-pills button { min-height: 28px; padding: 0 13px; border: 0; border-radius: 999px; background: transparent; color: #dceadd; font: 600 11.5px/1 system-ui; letter-spacing: .02em; cursor: pointer; transition: background .18s, color .18s; }
@@ -1228,12 +1453,32 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .diary-cta-arrow { display: inline-block; animation: cta-nudge 1.5s ease-in-out infinite; }
 @keyframes cta-nudge { 0%, 100% { transform: translateX(0) } 50% { transform: translateX(4px) } }
 
+.legend-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+  background: #00000055;
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: notes-fade .2s ease both;
+}
+
 @media (max-width: 1100px) {
   .pane-crisis .pane-grid { grid-template-columns: minmax(0, 1.5fr) minmax(280px, .85fr); }
 }
 
 @media (max-width: 900px), (max-height: 620px) {
-  .legend-flyout { position: fixed; left: 12px; right: 12px; bottom: 12px; width: auto; }
+  .legend-flyout {
+    position: fixed;
+    left: 8px;
+    right: 8px;
+    bottom: calc(var(--bottom-bar, 58px) + 8px);
+    width: auto;
+    max-width: none;
+    max-height: min(72dvh, 480px);
+    border-radius: 16px;
+    box-shadow: 0 10px 35px #00000080;
+  }
 }
 
 
@@ -1265,8 +1510,84 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   .brand small { display: none; }
 }
 @media (max-width: 860px) {
-  .site-shell.is-deck .topbar { height: auto; flex-wrap: wrap; padding: 8px 14px; gap: 8px 12px; }
-  .topbar-title { order: 3; flex: 1 0 100%; white-space: normal; font-size: 19px; }
+  .site-shell.is-deck .topbar {
+    height: auto;
+    min-height: 56px;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px clamp(10px, 3vw, 16px);
+    gap: 6px 8px;
+  }
+  .brand {
+    order: 1;
+    font-size: 18px;
+    gap: 7px;
+  }
+  .brand-seal {
+    width: 32px;
+    height: 32px;
+    font-size: 20px;
+  }
+  .farm-switch {
+    order: 2;
+    margin-top: 0;
+  }
+  .farm-switch button {
+    min-height: 28px;
+    padding: 4px 10px;
+    font-size: 10px;
+  }
+  .notes-trigger {
+    order: 3;
+    min-height: 32px;
+    padding: 0 10px;
+    font-size: 11px;
+    gap: 5px;
+  }
+  .sound-toggle, .narration-toggle {
+    order: 4;
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    min-height: 32px;
+  }
+  .topbar-title {
+    order: 10;
+    flex: 1 0 100%;
+    margin: 2px 0 0;
+    white-space: normal;
+    font-size: clamp(14px, 3.6vw, 18px);
+    line-height: 1.25;
+  }
+}
+@media (max-width: 480px) {
+  .site-shell.is-deck .topbar {
+    padding: 6px 8px;
+    gap: 5px 6px;
+  }
+  .brand {
+    font-size: 16px;
+  }
+  .brand span small {
+    display: none;
+  }
+  .farm-switch button {
+    padding: 3px 7px;
+    font-size: 9.5px;
+  }
+  .notes-trigger {
+    padding: 0 7px;
+    font-size: 10px;
+  }
+  .notes-trigger span {
+    min-width: 16px;
+    height: 16px;
+    font-size: 9px;
+  }
+  .topbar-title {
+    font-size: 14.5px;
+  }
 }
 
 .notes-finding { color: #2c4b3c !important; font: 600 13.5px/1.5 Georgia, serif !important; }
@@ -1317,8 +1638,29 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .legend-ask { order: 2; }
 
 @media (max-width: 900px), (max-height: 620px) {
-  .dial-corner { position: static; align-items: stretch; margin-top: 10px; }
-  .dial-pill { width: 100%; justify-content: flex-start; }
+  .dial-corner {
+    position: static;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: stretch;
+    gap: 8px;
+    margin-top: 10px;
+    width: 100%;
+  }
+  .dial-corner > .dial-pill {
+    flex: 1;
+    width: auto;
+    min-height: 38px;
+    justify-content: center;
+    font-size: 11.5px;
+    padding: 0 10px;
+  }
+  .legend-ask {
+    position: static;
+    width: auto;
+    justify-content: center;
+  }
 }
 
 /* The root-zone view uses the width of its stage and gives each action a clear role. */
@@ -1863,3 +2205,306 @@ li[data-moved='no'] .shift-change { color: #6b7d6e; font-weight: 500; }
    row and push the verdict chip out of the panel. */
 .shift-row { flex-wrap: wrap; }
 .shift-row strong { min-width: 0; overflow-wrap: anywhere; }
+
+/* ======================================================================
+   RESPONSIVE UI SYSTEM (Desktop, Tablet & Mobile)
+   - Preserves Desktop (>= 1024px) baseline
+   - Tablet (768px - 1023px)
+   - Mobile (480px - 767px)
+   - Small Mobile (< 480px)
+   ====================================================================== */
+
+/* --- Tablet Adaptations (768px - 1023px) --- */
+@media (max-width: 1023px) {
+  .hero-world {
+    max-width: 620px;
+    margin: 0 auto;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  .year-ring-stage {
+    height: clamp(320px, 48vh, 480px);
+    width: 100%;
+  }
+  .hero-world .year-ring-stage-2d > svg {
+    max-height: 100%;
+    max-width: 100%;
+    aspect-ratio: 1 / 1;
+  }
+  .planner-column {
+    height: auto;
+    min-height: 0;
+    max-height: none;
+    overflow: visible;
+  }
+  .shift-readout {
+    max-height: none;
+    overflow: visible;
+  }
+}
+
+/* --- Mobile Adaptations (480px - 767px) --- */
+@media (max-width: 768px) {
+  .hero-world {
+    padding: 10px 8px;
+    border-radius: 16px;
+    max-width: 540px;
+  }
+  .year-ring-stage {
+    height: clamp(280px, 68vw, 400px);
+  }
+  .hero-world .year-ring-tooltip {
+    left: 8px;
+    right: 8px;
+    transform: none;
+    width: auto;
+    max-width: none;
+    bottom: 6px;
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+
+  /* Time Lever on Mobile */
+  .time-lever {
+    margin-top: 10px;
+    padding: 10px 14px 8px;
+    border-radius: 14px;
+  }
+  .time-lever-heading strong {
+    font-size: 19px;
+  }
+  .time-lever-heading small {
+    font-size: 11px;
+  }
+  .time-lever input[type="range"] {
+    min-height: 32px;
+    margin: 8px 0 4px;
+  }
+  .season-jumps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .season-jumps button {
+    flex: 1 1 20%;
+    min-height: 36px;
+    padding: 4px 6px;
+    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Crop Planner & Seed Packets on Mobile */
+  .crop-planner {
+    padding: 14px;
+    border-radius: 16px;
+  }
+  .planner-heading h2 {
+    font-size: 19px;
+  }
+  .seed-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .seed-packet {
+    min-height: 102px;
+    padding: 8px 10px;
+  }
+  .seed-art svg {
+    width: 32px;
+    height: 32px;
+  }
+  .seed-packet strong {
+    font-size: 12px;
+  }
+  .seed-packet small {
+    font-size: 9.5px;
+  }
+  .picked-details {
+    margin-top: 10px;
+    padding: 12px;
+    border-radius: 10px;
+  }
+  .picked-details button {
+    min-height: 42px;
+    width: 100%;
+    font-size: 13px;
+    margin-top: 6px;
+    cursor: pointer;
+  }
+  .proposal-results {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  /* Atmosphere Readout on Mobile */
+  .atmosphere-readout {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .atmosphere-readout > div {
+    flex: none;
+    padding: 8px 10px;
+  }
+
+  /* Phase Year Chart on Mobile */
+  .phase-year-chart {
+    min-height: 190px;
+    padding: 12px 14px 10px;
+  }
+  .phase-year-chart figcaption {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .phase-year-chart figcaption strong {
+    font-size: 17px;
+  }
+  .phase-chart-day {
+    font-size: 16px;
+  }
+  .phase-chart-legend {
+    gap: 4px 12px;
+    font-size: 10px;
+  }
+  .phase-chart-plot {
+    min-height: 80px;
+  }
+
+  /* Storm Run Button on Mobile */
+  .pane-root .storm-run {
+    min-height: 52px;
+    padding: 8px 12px;
+  }
+  .storm-run > span:nth-child(2) {
+    font-size: 12.5px;
+  }
+  .storm-run-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 22px;
+  }
+
+  /* Modals & Drawers on Mobile */
+  .notes-drawer {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  .notes-drawer-head {
+    padding: 14px 16px;
+  }
+  .notes-drawer-head button {
+    width: 44px;
+    height: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    font-size: 24px;
+  }
+  .notes-drawer-body {
+    padding: 16px 16px max(24px, env(safe-area-inset-bottom));
+  }
+
+  .diary-overlay {
+    padding: 8px;
+  }
+  .diary-book {
+    width: calc(100vw - 16px);
+    max-height: 92dvh;
+  }
+  .diary-book-head {
+    padding: 12px 14px;
+    gap: 8px;
+  }
+  .diary-book-head h2 {
+    font-size: 18px;
+    padding-right: 36px;
+  }
+  .diary-close {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+    font-size: 22px;
+    top: 8px;
+    right: 8px;
+  }
+  .diary-tabs {
+    margin-right: 36px;
+    gap: 4px;
+  }
+  .diary-tabs button {
+    min-height: 36px;
+    padding: 0 10px;
+    font-size: 11px;
+  }
+
+  /* Enter Gate on Mobile */
+  .enter-card {
+    padding: 16px 14px;
+  }
+  .enter-card h1 {
+    font-size: clamp(32px, 8vw, 56px);
+  }
+  .enter-card p {
+    font-size: 14px;
+    margin-bottom: 20px;
+  }
+  .enter-begin {
+    min-height: 50px;
+    padding: 0 30px;
+    font-size: 14.5px;
+  }
+}
+
+/* --- Small Mobile Adaptations (< 480px, down to 320px) --- */
+@media (max-width: 480px) {
+  .year-ring-stage {
+    height: clamp(250px, 76vw, 340px);
+  }
+  .time-lever {
+    padding: 8px 10px 6px;
+  }
+  .time-lever-heading strong {
+    font-size: 17px;
+  }
+  .time-lever-mark {
+    display: none;
+  }
+  .season-jumps {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 4px;
+  }
+  .seed-packet {
+    padding: 6px 8px;
+  }
+  .seed-bottom {
+    font-size: 9px;
+  }
+  .diary-book-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .diary-tabs {
+    width: 100%;
+    margin-right: 0;
+    margin-top: 6px;
+  }
+  .diary-tabs button {
+    flex: 1;
+    justify-content: center;
+  }
+  .intro-dialogue {
+    width: calc(100vw - 20px);
+    padding: 14px 16px 12px;
+  }
+  .sat-caption {
+    left: 12px;
+    right: 12px;
+    bottom: 24px;
+  }
+  .sat-caption h2 {
+    font-size: 22px;
+  }
+}

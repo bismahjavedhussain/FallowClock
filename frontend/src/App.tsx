@@ -636,6 +636,22 @@ export default function App() {
                   locked={!!selected && !selected.is_current}
                 />
               )}
+              {selected && !selected.is_current && (
+                <div className="rotation-preview-banner" role="status">
+                  <span className="preview-tag">Candidate</span>
+                  <span className="preview-label">
+                    <strong>{selected.label}</strong>: {selected.bare_days} bare days ({selected.delta_vs_current_pct > 0 ? '+' : ''}{selected.delta_vs_current_pct.toFixed(0)}% vs baseline)
+                  </span>
+                  <button
+                    type="button"
+                    className="preview-reset"
+                    onClick={() => { playSwitch(); selectRotation(null) }}
+                    title="Return to current field rotation"
+                  >
+                    Return to current &times;
+                  </button>
+                </div>
+              )}
               <div className="dial-corner" ref={setDialCorner}>
                 <LegendFlyout
                   open={legendOpen}
@@ -661,7 +677,11 @@ export default function App() {
               onOpenDiary={() => { playSwitch(); setSlide(1); setDiaryOpen(true) }}
             />
             <div className="field-summary" aria-label="Field overview">
-              <div><span className="eyebrow">{bundle.provenance.is_synthetic ? 'From this sample' : 'From this field'}</span><strong>{shownBareDays} <small>days</small></strong><p>{activePhase ? `bare in a ${activePhase} year` : (phaseSplit ?? 'of bare soil expected per year')}</p></div>
+              <div>
+                <span className="eyebrow">{selected && !selected.is_current ? 'Candidate rotation' : bundle.provenance.is_synthetic ? 'From this sample' : 'From this field'}</span>
+                <strong>{selected && !selected.is_current ? selected.bare_days : shownBareDays} <small>days</small></strong>
+                <p>{selected && !selected.is_current ? `expected bare in ${selected.label}` : activePhase ? `bare in a ${activePhase} year` : (phaseSplit ?? 'of bare soil expected per year')}</p>
+              </div>
               <div><span className="eyebrow">Erosivity overlap</span><strong>{Math.round((bundle.gaps[0]?.share_of_annual_r ?? 0) * 100)}<small>%</small></strong><p>of annual erosivity overlaps the largest bare gap</p></div>
             </div>
             <CropPlanner species={bundle.species} fits={ranked} picked={draggingSpeciesId} placed={placedFills} onPick={setDraggingSpecies} onPlace={() => pickedFit && placeCrop(pickedFit.seedDoy)} onRemove={removePlacedFill} onReset={resetPlacedFills} baselineBare={baselineBare} proposedBare={proposedBare} baselineExposure={baselineExposure} proposedExposure={proposedExposure} hasProposal={accepted.length > 0} phaseNote={phaseIndex >= 0 && phaseLabels ? `in a ${phaseLabels[phaseIndex]} year` : (metricPhases ? 'averaged over both rotation years' : null)} />

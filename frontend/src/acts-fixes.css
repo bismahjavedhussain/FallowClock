@@ -22,6 +22,14 @@
 .pane-desk .desk-head .diary-pages { grid-area: pages; width: min(440px, 34vw); min-height: 84px; max-height: 128px; margin: 0; padding: 12px 15px; border-radius: 6px; }
 .pane-desk .pane-grid { grid-template-rows: minmax(0, 1fr); }
 
+@media (max-width: 860px) {
+  .pane-desk .desk-head { display: flex; flex-direction: column; gap: 8px; }
+  .pane-desk .desk-head .farmer-diary.is-inline { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 4px; }
+  .pane-desk .desk-head .diary-pages { display: none; }
+  .pane-desk .desk-head .diary-tab,
+  .pane-desk .desk-head .diary-open-full { display: inline-flex; min-height: 36px; padding: 6px 14px; font-size: 11.5px; align-items: center; }
+}
+
 /* --- Act three: labels that ran into each other ----------------------- */
 /* "Water" rides the water line up the right edge and collided with "Roots"
    whenever the soil was wet. Roots now sits on the left between Topsoil and
@@ -33,6 +41,18 @@
 /* The right-hand column was cut off on short screens instead of scrolling. */
 .pane-root .pane-grid { grid-template-rows: minmax(0, 1fr); }
 
+@media (max-width: 768px) {
+  .soil-scene-labels span { padding: 3px 6px; font-size: 9px; }
+}
+@media (max-width: 480px) {
+  .soil-scene-labels span { padding: 2px 5px; font-size: 8px; }
+  .soil-scene-labels .soil-scene-roots { left: 8px; }
+  .soil-scene-labels .soil-scene-topsoil { left: 8px; }
+  .soil-scene-labels .soil-scene-subsoil { left: 8px; }
+  .soil-scene-labels .soil-scene-residue { left: 8px; }
+  .soil-scene-labels .soil-scene-water { right: 8px; }
+}
+
 /* --- Act four --------------------------------------------------------- */
 /* Dark green on the dark page: unreadable. */
 .site-shell.is-deck .pane-futures .comparison-note { color: #bcd3c2; }
@@ -42,8 +62,20 @@
 .pane-futures .split-panel.is-plan { border-color: #d9b56a; background: #fffaf0; }
 .pane-futures .split-panel.is-plan .split-tag { background: #8a6a45; color: #fdf4e2; }
 .pane-futures .split-panel-actions { flex-wrap: wrap; }
-@media (max-width: 980px) {
-  .pane-futures .split-grid[data-count='4'] { grid-template-columns: 1fr; }
+@media (min-width: 768px) and (max-width: 1023px) {
+  .pane-futures .split-grid,
+  .pane-futures .split-grid[data-count='4'] { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px; }
+  .pane-futures .split-panel .soil-cutaway { min-height: 130px; max-height: 180px; }
+}
+@media (max-width: 767px) {
+  .pane-futures .split-grid,
+  .pane-futures .split-grid[data-count='4'] { grid-template-columns: 1fr !important; gap: 12px; }
+  .pane-futures .split-panel .soil-cutaway { min-height: 140px; max-height: 200px; }
+  .pane-futures .split-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
+  .pane-futures .split-metrics div { min-height: 48px; padding: 6px 4px; text-align: center; }
+  .pane-futures .split-metrics dt { font-size: 8px; }
+  .pane-futures .split-metrics dd { font-size: 14px; }
+  .futures-detail-row { grid-template-columns: 1fr; gap: 8px; }
 }
 
 /* --- Skip narration --------------------------------------------------- */
@@ -53,7 +85,7 @@
 .skip-narration:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
 /* On small screens the brief's text box reaches the bottom corners. */
 @media (max-width: 900px), (max-height: 620px) {
-  .skip-narration { top: 12px; bottom: auto; right: 12px; }
+  .skip-narration { top: max(12px, env(safe-area-inset-top)); bottom: auto; right: max(12px, env(safe-area-inset-right)); }
 }
 
 /* --- Title card: epigraph and team credit ----------------------------- */

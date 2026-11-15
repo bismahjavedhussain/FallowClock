@@ -101,7 +101,20 @@ export default function SplitCore({
               <header>
                 <div className="split-panel-actions">
                   <span className="split-tag">{s.isPlan ? 'Your plan' : s.isCurrent ? 'Today' : `Option ${i}`}</span>
-                  {onSelect && !s.isPlan && <button type="button" className="split-select" aria-pressed={selectedId === (s.isCurrent ? null : s.id)} onClick={() => onSelect(s.isCurrent ? null : s.id)}>{selectedId === (s.isCurrent ? null : s.id) ? 'On year wheel ✓' : 'View on year wheel →'}</button>}
+                  {onSelect && (
+                    <button
+                      type="button"
+                      className="split-select"
+                      aria-pressed={!s.isPlan && selectedId === (s.isCurrent ? null : s.id)}
+                      onClick={() => onSelect(s.isPlan || s.isCurrent ? null : s.id)}
+                    >
+                      {s.isPlan
+                        ? 'View plan on wheel →'
+                        : selectedId === (s.isCurrent ? null : s.id)
+                        ? 'On year wheel ✓'
+                        : 'View on year wheel →'}
+                    </button>
+                  )}
                 </div>
                 <h3>{s.label}</h3>
               </header>
