@@ -583,7 +583,7 @@ export default function App() {
       <a className="brand" href="#top" onClick={() => setMobileMenuOpen(false)}><span className="brand-seal" aria-hidden="true">&#10042;</span><span>Fallow Clock<small>THE LIVING YEAR</small></span></a>
       <h1 className="topbar-title">{slide === 0 ? <>Find the <em>hole</em> in your year.</> : actCopy.title}</h1>
       <div className="farm-switch" role="group" aria-label="Choose a field">{FARMS.map((f) => <button type="button" key={f.id} onClick={() => { playSwitch(); setFarmId(f.id) }} aria-pressed={farmId === f.id} className={farmId === f.id ? 'is-active' : ''}>{f.label}</button>)}</div>
-      <button type="button" className="notes-trigger" onClick={() => { playSwitch(); setNotesOpen(true) }} aria-haspopup="dialog">Field notes <span>{bundle.uncertainty.length}</span></button>
+      <button type="button" className="notes-trigger" onClick={() => { playSwitch(); setNotesOpen(true) }} aria-haspopup="dialog" title={`${bundle.uncertainty.length} known limits of this data: what we measured, modelled, and do not know`}>Field notes <span>{bundle.uncertainty.length}</span></button>
       <div className="topbar-actions">
         <div className="topbar-audio-tablet">
           <NarrationToggle onStopNarration={() => {
@@ -990,15 +990,12 @@ export default function App() {
 
     {/* He keeps to his bottom-left corner in every act. */}
     <FarmerGuide line={guide} reducedMotion={reducedMotion} writing={writing} />
-    {!briefDone && (
+    {/* Not on the title card. On the descent it moves on to the farmer's
+        brief; on the brief it moves on to the dashboard. */}
+    {entered && !briefDone && (
       <SkipNarration onSkip={() => {
-        // Same audio unlock as Begin, in case this is the first click.
-        setEngineSound(true)
-        useStore.getState().setSoundEnabled(true)
-        primeOnFirstGesture()
-        setEntered(true)
-        setIntroDone(true)
-        setBriefDone(true)
+        if (!introDone) setIntroDone(true)
+        else setBriefDone(true)
       }} />
     )}
     <FieldDiaryModal
