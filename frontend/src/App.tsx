@@ -24,7 +24,6 @@ import { sourceLines } from './lib/sources'
 import SatelliteIntro from './components/SatelliteIntro'
 import FarmerIntro from './components/FarmerIntro'
 import { buildIntroBeats } from './lib/intro'
-import FarmerDiary from './components/FarmerDiary'
 import FarmerThinking from './components/FarmerThinking'
 import FieldDiaryModal from './components/FieldDiaryModal'
 import LegendFlyout from './components/LegendFlyout'
@@ -133,6 +132,7 @@ export default function App() {
   const [diary, setDiary] = useState<DiaryEntry[]>([])
   const [diaryOpen, setDiaryOpen] = useState(false)
   const [legendOpen, setLegendOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   // The dial's bottom-right corner. Both pills render into this one box so
   // the space between them is a flex `gap` and not two guesses.
   const [dialCorner, setDialCorner] = useState<HTMLDivElement | null>(null)
@@ -529,16 +529,88 @@ export default function App() {
     {bundle.provenance.is_synthetic && <div className="fixture-banner" role="status"><span>&#10035;</span> SYNTHETIC SAMPLE &mdash; simulated soil cover; no satellite observations. <span>&#10035;</span></div>}
 
     <header className="topbar" aria-label="Fallow Clock">
-      <a className="brand" href="#top"><span className="brand-seal" aria-hidden="true">&#10042;</span><span>Fallow Clock<small>THE LIVING YEAR</small></span></a>
+      <a className="brand" href="#top" onClick={() => setMobileMenuOpen(false)}><span className="brand-seal" aria-hidden="true">&#10042;</span><span>Fallow Clock<small>THE LIVING YEAR</small></span></a>
       <h1 className="topbar-title">{slide === 0 ? <>Find the <em>hole</em> in your year.</> : actCopy.title}</h1>
       <div className="farm-switch" role="group" aria-label="Choose a field">{FARMS.map((f) => <button type="button" key={f.id} onClick={() => { playSwitch(); setFarmId(f.id) }} aria-pressed={farmId === f.id} className={farmId === f.id ? 'is-active' : ''}>{f.label}</button>)}</div>
       <button type="button" className="notes-trigger" onClick={() => { playSwitch(); setNotesOpen(true) }} aria-haspopup="dialog">Field notes <span>{bundle.uncertainty.length}</span></button>
-      <NarrationToggle onStopNarration={() => {
-        setIntroDone(true)
-        setBriefDone(true)
-      }} />
+      <div className="topbar-actions">
+        <NarrationToggle onStopNarration={() => {
+          setIntroDone(true)
+          setBriefDone(true)
+        }} />
+        <button
+          type="button"
+          className="topbar-hamburger"
+          onClick={() => { playSwitch(); setMobileMenuOpen((o) => !o) }}
+          aria-expanded={mobileMenuOpen}
+          aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+        >
+          <span className="hamburger-icon" aria-hidden="true">{mobileMenuOpen ? '✕' : '☰'}</span>
+          <span className="hamburger-label">{mobileMenuOpen ? 'Close' : 'Menu'}</span>
+        </button>
+      </div>
       <AudioAtmosphere doy={selectedDoy} />
     </header>
+
+    {mobileMenuOpen && (
+      <>
+        <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
+        <nav className="topbar-mobile-menu" aria-label="Mobile navigation">
+          <div className="mobile-menu-head">
+            <span className="eyebrow">Location &amp; Controls</span>
+            <button
+              type="button"
+              className="mobile-menu-close"
+              onClick={() => setMobileMenuOpen(false)}
+              aria-label="Close navigation menu"
+            >
+              &times;
+            </button>
+          </div>
+          <div className="mobile-menu-section">
+            <span className="mobile-section-label">Select Field</span>
+            <div className="mobile-farm-switch">
+              {FARMS.map((f) => (
+                <button
+                  type="button"
+                  key={f.id}
+                  onClick={() => {
+                    playSwitch()
+                    setFarmId(f.id)
+                    setMobileMenuOpen(false)
+                  }}
+                  className={`mobile-farm-btn ${farmId === f.id ? 'is-active' : ''}`}
+                >
+                  <span className="farm-check" aria-hidden="true">{farmId === f.id ? '✓ ' : ''}</span>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="mobile-menu-section">
+            <span className="mobile-section-label">Documentation</span>
+            <button
+              type="button"
+              className="mobile-notes-btn"
+              onClick={() => {
+                playSwitch()
+                setNotesOpen(true)
+                setMobileMenuOpen(false)
+              }}
+            >
+              <span>Field Notes &amp; Uncertainties</span>
+              <span className="notes-badge">{bundle.uncertainty.length}</span>
+            </button>
+          </div>
+          <div className="mobile-menu-foot">
+            <p className="mobile-menu-act">
+              <strong>Act {slide + 1}: {SLIDES[slide]?.label}</strong>
+              <small>{actCopy.title}</small>
+            </p>
+          </div>
+        </nav>
+      </>
+    )}
 
     {!entered && (
       <div className="enter-gate" role="dialog" aria-label="Start Fallow Clock">
@@ -694,7 +766,20 @@ export default function App() {
       <div className="act-pane pane-desk">
         <div className="act-head desk-head">
           <p>{acts[1].line}</p>
-          <FarmerDiary entries={diary} reducedMotion={reducedMotion} inline onOpenFull={() => setDiaryOpen(true)} />
+          <div className="farmer-thinking is-done desk-diary-cta">
+            <img
+              src="/sprite/farmer-write/south-east.png"
+              width={48}
+              height={48}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+            />
+            <button type="button" className="diary-cta" onClick={() => { playSwitch(); setDiaryOpen(true) }}>
+              See the farmer&rsquo;s diary
+              <span className="diary-cta-arrow" aria-hidden="true">→</span>
+            </button>
+          </div>
         </div>
         <div className="pane-grid">
           <div className="pane-main desk-readout">

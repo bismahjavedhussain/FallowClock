@@ -88,3 +88,43 @@ describe('ResponsiveLayout - Field Summary Card Resilience', () => {
     expect(html).toContain('62<small>%</small>')
   })
 })
+
+describe('ResponsiveLayout - PhaseYearChart Horizontal Scroll Wrapper', () => {
+  it('wraps the SVG line chart and month axis inside a scrollable container', async () => {
+    const { default: PhaseYearChart } = await import('./PhaseYearChart')
+    const sampleCover = new Array(365).fill(0.5)
+    const html = renderToStaticMarkup(
+      <PhaseYearChart average={sampleCover} doy={180} />
+    )
+
+    expect(html).toContain('class="phase-chart-scroll-wrap"')
+    expect(html).toContain('class="phase-chart-canvas"')
+    expect(html).toContain('role="region"')
+    expect(html).toContain('aria-label="Scrollable year soil cover chart"')
+  })
+})
+
+describe('ResponsiveLayout - Act 2 Single Farmer Diary CTA', () => {
+  it('renders the single farmer diary button matching the home page style', () => {
+    const html = renderToStaticMarkup(
+      <div className="farmer-thinking is-done desk-diary-cta">
+        <img
+          src="/sprite/farmer-write/south-east.png"
+          width={48}
+          height={48}
+          alt=""
+          aria-hidden="true"
+        />
+        <button type="button" className="diary-cta">
+          See the farmer&rsquo;s diary
+          <span className="diary-cta-arrow" aria-hidden="true">→</span>
+        </button>
+      </div>
+    )
+
+    expect(html).toContain('class="farmer-thinking is-done desk-diary-cta"')
+    expect(html).toContain('class="diary-cta"')
+    expect(html).toContain('See the farmer’s diary')
+    expect(html).toContain('class="diary-cta-arrow"')
+  })
+})

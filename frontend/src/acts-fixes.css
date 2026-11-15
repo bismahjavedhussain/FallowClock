@@ -12,23 +12,23 @@
 .site-shell[data-act='desk'] .farmer-shadow { bottom: 6px; width: 54px; margin-left: -27px; height: 7px; }
 .site-shell[data-act='desk'] .farmer-bubble { margin-bottom: 26px; }
 
-/* --- Act two: the field diary in the heading row ---------------------- */
-/* The tab and the "Open the field diary" link sat on one line with no gap,
-   and the open pages pushed the whole act down and crushed the chart. Now:
-   pages on the left as a short strip, tab and link stacked on the right. */
-.pane-desk .desk-head .farmer-diary.is-inline { display: grid; grid-template-columns: auto auto; grid-template-areas: 'pages open' 'pages tab'; column-gap: 14px; row-gap: 7px; align-items: start; justify-items: end; }
-.pane-desk .desk-head .diary-tab { grid-area: tab; white-space: nowrap; }
-.pane-desk .desk-head .diary-open-full { grid-area: open; margin: 0; white-space: nowrap; }
-.pane-desk .desk-head .diary-pages { grid-area: pages; width: min(440px, 34vw); min-height: 84px; max-height: 128px; margin: 0; padding: 12px 15px; border-radius: 6px; }
-.pane-desk .pane-grid { grid-template-rows: minmax(0, 1fr); }
-
-@media (max-width: 860px) {
-  .pane-desk .desk-head { display: flex; flex-direction: column; gap: 8px; }
-  .pane-desk .desk-head .farmer-diary.is-inline { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-start; gap: 8px; margin-top: 4px; }
-  .pane-desk .desk-head .diary-pages { display: none; }
-  .pane-desk .desk-head .diary-tab,
-  .pane-desk .desk-head .diary-open-full { display: inline-flex; min-height: 36px; padding: 6px 14px; font-size: 11.5px; align-items: center; }
+/* --- Act two: single farmer diary button in heading row ---------------- */
+.pane-desk .desk-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
 }
+.pane-desk .desk-head p {
+  margin: 0;
+  max-width: 68ch;
+}
+.pane-desk .desk-diary-cta {
+  flex: none;
+  margin: 0;
+}
+.pane-desk .pane-grid { grid-template-rows: minmax(0, 1fr); }
 
 /* --- Act three: labels that ran into each other ----------------------- */
 /* "Water" rides the water line up the right edge and collided with "Roots"

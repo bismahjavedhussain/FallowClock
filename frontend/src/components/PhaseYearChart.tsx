@@ -36,18 +36,22 @@ export default function PhaseYearChart({ average, phases, labels, doy }: {
       {series.map((item) => <span key={item.label} style={{ ['--series-color' as string]: item.color }}>{item.label}: {Math.round((item.values[doy - 1] ?? 0) * 100)}%</span>)}
       <span style={{ ['--series-color' as string]: '#176a52' }}>Average: {Math.round((average[doy - 1] ?? 0) * 100)}% (Act one wheel's starting view)</span>
     </div>
-    <div className="phase-chart-plot">
-      <div className="phase-chart-axis" aria-hidden="true"><span>100%</span><span>50%</span><span>0%</span></div>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" role="img" aria-label={`Soil cover curves from January through December; selected day ${doyToDate(doy).label}`}>
-        {[TOP, (TOP + BOTTOM) / 2, BOTTOM].map((y) => <line key={y} x1="0" x2={WIDTH} y1={y} y2={y} className="phase-chart-gridline" />)}
-        <rect x="0" y={BOTTOM - .3 * (BOTTOM - TOP)} width={WIDTH} height={.3 * (BOTTOM - TOP)} className="phase-chart-bare-band" />
-        {series.map((item) => <polyline key={item.label} points={line(item.values)} fill="none" stroke={item.color} className="phase-chart-series" />)}
-        <polyline points={line(average)} fill="none" stroke="#176a52" className="phase-chart-average" />
-        <line x1={markerX} x2={markerX} y1={TOP} y2={BOTTOM} className="phase-chart-marker" />
-        {[...series, { values: average, label: 'Average', color: '#176a52' }].map((item) => <circle key={item.label} cx={markerX} cy={BOTTOM - Math.max(0, Math.min(1, item.values[doy - 1] ?? 0)) * (BOTTOM - TOP)} r="6" fill={item.color} className="phase-chart-dot" />)}
-      </svg>
+    <div className="phase-chart-scroll-wrap" tabIndex={0} role="region" aria-label="Scrollable year soil cover chart">
+      <div className="phase-chart-canvas">
+        <div className="phase-chart-plot">
+          <div className="phase-chart-axis" aria-hidden="true"><span>100%</span><span>50%</span><span>0%</span></div>
+          <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} preserveAspectRatio="none" role="img" aria-label={`Soil cover curves from January through December; selected day ${doyToDate(doy).label}`}>
+            {[TOP, (TOP + BOTTOM) / 2, BOTTOM].map((y) => <line key={y} x1="0" x2={WIDTH} y1={y} y2={y} className="phase-chart-gridline" />)}
+            <rect x="0" y={BOTTOM - .3 * (BOTTOM - TOP)} width={WIDTH} height={.3 * (BOTTOM - TOP)} className="phase-chart-bare-band" />
+            {series.map((item) => <polyline key={item.label} points={line(item.values)} fill="none" stroke={item.color} className="phase-chart-series" />)}
+            <polyline points={line(average)} fill="none" stroke="#176a52" className="phase-chart-average" />
+            <line x1={markerX} x2={markerX} y1={TOP} y2={BOTTOM} className="phase-chart-marker" />
+            {[...series, { values: average, label: 'Average', color: '#176a52' }].map((item) => <circle key={item.label} cx={markerX} cy={BOTTOM - Math.max(0, Math.min(1, item.values[doy - 1] ?? 0)) * (BOTTOM - TOP)} r="6" fill={item.color} className="phase-chart-dot" />)}
+          </svg>
+        </div>
+        <div className="phase-chart-months" aria-hidden="true"><span>Jan</span><span>Mar</span><span>May</span><span>Jul</span><span>Sep</span><span>Nov</span><span>Dec</span></div>
+      </div>
     </div>
-    <div className="phase-chart-months" aria-hidden="true"><span>Jan</span><span>Mar</span><span>May</span><span>Jul</span><span>Sep</span><span>Nov</span><span>Dec</span></div>
     <p>The shaded band marks less than 30% soil cover. Move the date slider to compare the same day after each crop.</p>
   </figure>
 }

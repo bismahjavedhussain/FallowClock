@@ -812,24 +812,75 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
    while allowing internal vertical scrolling within individual act panes so
    no interactive elements or data are ever clipped or trapped. */
 @media (max-width: 1023px) {
-  :root { --farmer-lane: 0px; --bottom-bar: 64px; }
+  :root { --farmer-lane: 0px; --bottom-bar: 56px; }
   .site-shell.is-deck { height: 100dvh; min-height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
   .deck { position: relative; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
-  .deck-track { display: flex; height: 100%; width: 100%; will-change: transform; flex: 1; min-height: 0; }
+  .deck-track { display: flex; flex: 1 1 auto; min-height: 0; width: 100%; will-change: transform; }
   .deck-slide { flex: 0 0 100%; width: 100%; height: 100%; min-width: 0; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
-  .act-pane { min-height: 100%; height: auto; overflow: visible; padding: 12px clamp(10px, 2.5vw, 24px) calc(var(--bottom-bar) + 20px); box-sizing: border-box; }
+  .act-pane { min-height: min-content; height: auto; overflow: visible; padding: 12px clamp(10px, 2.5vw, 24px) 24px; box-sizing: border-box; }
   .pane-grid { grid-template-columns: 1fr; gap: 16px; }
   .pane-side { overflow: visible; }
-  .pane-side .field-summary { position: relative; top: auto; }
+  .pane-side .field-summary { position: static; top: auto; }
   .pane-futures .rotation-list { grid-template-columns: 1fr; }
+
+  /* Act 1 Mobile Hierarchy:
+     1. Visualization (Wheel) with 2D/3D controls on top and reset/how-to pills below
+     2. Cover Soil selected day box (.field-summary)
+     3. Date Slider (.time-lever)
+     4. Lush meter (if active)
+     5. Farmer's diary prompt (.farmer-thinking)
+     6. Crop planner (.crop-planner) */
+  .pane-crisis .pane-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .pane-crisis .pane-main,
+  .pane-crisis .pane-side {
+    display: contents;
+  }
+  .pane-crisis .hero-world {
+    order: 1;
+    margin-bottom: 2px;
+    width: 100%;
+  }
+  .pane-crisis .field-summary {
+    order: 2;
+    width: 100%;
+    position: static !important;
+  }
+  .pane-crisis .time-lever {
+    order: 3;
+    width: 100%;
+  }
+  .pane-crisis .lush-meter {
+    order: 4;
+    width: 100%;
+  }
+  .pane-crisis .farmer-thinking {
+    order: 5;
+    width: 100%;
+  }
+  .pane-crisis .crop-planner {
+    order: 6;
+    width: 100%;
+  }
+  .pane-crisis .placement-message {
+    order: 7;
+    width: 100%;
+  }
+
+  /* Bottom Navigation Bar:
+     Uses natural flex flow below the slides so it NEVER overlaps screen content. */
   .site-shell.is-deck .deck-nav {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    position: relative !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    flex: none !important;
     z-index: 30;
     height: var(--bottom-bar);
-    padding: 8px clamp(10px, 3vw, 20px) max(8px, env(safe-area-inset-bottom));
+    padding: 6px clamp(10px, 3vw, 20px) max(6px, env(safe-area-inset-bottom));
     background: #061710ee;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
@@ -837,6 +888,37 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
     display: flex;
     align-items: center;
     justify-content: space-between;
+    margin-top: auto;
+  }
+
+  /* Scaled Little Dude:
+     Scaled down to 36x36px across tablet & mobile so the screen is unobscured. */
+  .farmer-guide {
+    position: fixed;
+    left: 8px;
+    bottom: calc(var(--bottom-bar) + 8px);
+    z-index: 35;
+    width: auto;
+    height: auto;
+  }
+  .farmer-sprite,
+  .farmer-sprite img,
+  .site-shell[data-act='desk'] .farmer-sprite,
+  .site-shell[data-act='desk'] .farmer-sprite img {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  .farmer-shadow {
+    width: 24px !important;
+    height: 4px !important;
+    margin-left: -12px !important;
+    bottom: 2px !important;
+  }
+  .farmer-bubble {
+    max-width: min(210px, calc(100vw - 64px)) !important;
+    font-size: 11px !important;
+    padding: 7px 10px !important;
+    margin-bottom: 6px !important;
   }
 }
 
@@ -1522,19 +1604,59 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 @media (max-width: 1080px) {
   .brand small { display: none; }
 }
-@media (max-width: 860px) {
+/* --- Topbar Hamburger & Actions -------------------------------------- */
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.topbar-hamburger {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid #ffffff44;
+  border-radius: 999px;
+  background: #0f3d2fee;
+  color: #fdf5e6;
+  font: 600 12px/1 system-ui;
+  cursor: pointer;
+  transition: background .18s, border-color .18s;
+}
+.topbar-hamburger:hover {
+  background: #175440;
+  border-color: #f0cf87;
+}
+.topbar-hamburger:focus-visible {
+  outline: 2px solid #f0cf87;
+  outline-offset: 2px;
+}
+.hamburger-icon {
+  font-size: 15px;
+  color: #f0cf87;
+  line-height: 1;
+}
+
+@media (max-width: 1023px) {
+  .topbar-hamburger {
+    display: inline-flex;
+  }
   .site-shell.is-deck .topbar {
-    height: auto;
-    min-height: 56px;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    padding: 8px clamp(10px, 3vw, 16px);
-    gap: 6px 8px;
+    height: 56px !important;
+    min-height: 56px !important;
+    padding: 0 clamp(10px, 3vw, 16px) !important;
+    justify-content: space-between !important;
+    flex-wrap: nowrap !important;
+  }
+  .site-shell.is-deck .topbar .topbar-title,
+  .site-shell.is-deck .topbar .farm-switch,
+  .site-shell.is-deck .topbar .notes-trigger {
+    display: none !important;
   }
   .brand {
-    order: 1;
-    font-size: 18px;
+    font-size: 17px;
     gap: 7px;
   }
   .brand-seal {
@@ -1542,65 +1664,183 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
     height: 32px;
     font-size: 20px;
   }
-  .farm-switch {
-    order: 2;
-    margin-top: 0;
-  }
-  .farm-switch button {
-    min-height: 28px;
-    padding: 4px 10px;
-    font-size: 10px;
-  }
-  .notes-trigger {
-    order: 3;
-    min-height: 32px;
-    padding: 0 10px;
-    font-size: 11px;
-    gap: 5px;
-  }
-  .sound-toggle, .narration-toggle {
-    order: 4;
-    width: 32px;
-    height: 32px;
-    min-width: 32px;
-    min-height: 32px;
-  }
-  .topbar-title {
-    order: 10;
-    flex: 1 0 100%;
-    margin: 2px 0 0;
-    white-space: normal;
-    font-size: clamp(14px, 3.6vw, 18px);
-    line-height: 1.25;
-  }
-}
-@media (max-width: 480px) {
-  .site-shell.is-deck .topbar {
-    padding: 6px 8px;
-    gap: 5px 6px;
-  }
-  .brand {
-    font-size: 16px;
-  }
   .brand span small {
     display: none;
   }
-  .farm-switch button {
-    padding: 3px 7px;
-    font-size: 9.5px;
+}
+
+/* Mobile drawer backdrop */
+.mobile-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  background: #00000066;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  animation: notes-fade .2s ease both;
+}
+
+/* Mobile drawer panel */
+.topbar-mobile-menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(340px, 86vw);
+  z-index: 86;
+  background: #fdf8ee;
+  border-left: 2px solid #2f6b52;
+  box-shadow: -10px 0 35px #0000004d;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 20px 24px;
+  animation: mobile-menu-slide .25s cubic-bezier(.2,.85,.3,1) both;
+  overflow-y: auto;
+}
+@keyframes mobile-menu-slide {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+.mobile-menu-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed #c9b48f;
+}
+.mobile-menu-head .eyebrow {
+  color: #557764;
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.mobile-menu-close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid #c9b48f;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #334e40;
+  font-size: 20px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+}
+.mobile-menu-close:hover {
+  background: #f2eee2;
+}
+
+.mobile-menu-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+}
+.mobile-section-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: #7a6345;
+}
+.mobile-farm-switch {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.mobile-farm-btn {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #c3ceb8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2f4e3c;
+  font: 600 13px system-ui;
+  cursor: pointer;
+  text-align: left;
+  transition: all .16s ease;
+}
+.mobile-farm-btn.is-active {
+  background: #2f6b52;
+  border-color: #2f6b52;
+  color: #f7faf3;
+  box-shadow: 0 4px 12px #2f6b5233;
+}
+.mobile-farm-btn .farm-check {
+  margin-right: 6px;
+  font-weight: 700;
+}
+.mobile-notes-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid #c3ceb8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2f4e3c;
+  font: 600 13px system-ui;
+  cursor: pointer;
+}
+.mobile-notes-btn:hover {
+  background: #f7f9f4;
+}
+.mobile-notes-btn .notes-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #8a6a45;
+  color: #fffdf5;
+  font: 700 10px system-ui;
+}
+.mobile-menu-foot {
+  margin-top: auto;
+  padding-top: 20px;
+  border-top: 1px dashed #c9b48f;
+}
+.mobile-menu-act {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #495e51;
+  font-size: 12px;
+}
+.mobile-menu-act strong {
+  color: #244634;
+  font-size: 13.5px;
+}
+
+/* --- Line Chart Horizontal Scrolling (Act 2) ------------------------- */
+.phase-chart-scroll-wrap {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin-top: 10px;
+  scrollbar-width: thin;
+}
+.phase-chart-canvas {
+  width: 100%;
+  min-width: 620px;
+}
+@media (min-width: 1024px) {
+  .phase-chart-canvas {
+    min-width: 0;
   }
-  .notes-trigger {
-    padding: 0 7px;
-    font-size: 10px;
-  }
-  .notes-trigger span {
-    min-width: 16px;
-    height: 16px;
-    font-size: 9px;
-  }
-  .topbar-title {
-    font-size: 14.5px;
-  }
+}
+
+/* Act 2 single diary CTA button */
+.desk-diary-cta {
+  margin: 4px 0 0;
+  align-self: flex-start;
 }
 
 .notes-finding { color: #2c4b3c !important; font: 600 13.5px/1.5 Georgia, serif !important; }
