@@ -256,7 +256,9 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
       lastFrame = now
       updateCamera()
       const target = seasonWeights(seasonRef.current ?? 274)
-      const easing = motionRef.current ? 1 : 0.025
+      // Snappy seasonal response: responsive easing (0.075) so scrubbing or jumping
+      // to Spring / Summer / Autumn / Winter provides immediate, lively visual feedback.
+      const easing = motionRef.current ? 1 : 0.075
       for (const key of Object.keys(current) as (keyof typeof current)[]) current[key] += (target[key] - current[key]) * easing
       const time = clock.getElapsedTime()
       trees.forEach((tree) => tree.update(time, current, motionRef.current))

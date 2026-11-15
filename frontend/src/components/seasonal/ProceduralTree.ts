@@ -19,10 +19,14 @@ function rng(seed: number) {
 
 const clamp = (v: number) => Math.max(0, Math.min(1, v))
 const foliageColors: Record<Season, string[]> = {
-  spring: ['#f7a8c0', '#ffc6d0', '#fff0cf', '#b9ddb4'],
-  summer: ['#3f9c6e', '#65bc77', '#9bd488', '#d8e7a3'],
+  // Spring: Fresh, tender, vibrant young green leaves and buds
+  spring: ['#5eb85b', '#7ece61', '#9fe074', '#c4f08c'],
+  // Summer: Rich, deep, lush agricultural canopy greens
+  summer: ['#246c3b', '#2f8a48', '#42a559', '#63bf72'],
+  // Autumn: Fiery crimson, pumpkin orange, golden amber and warm yellow (preserved)
   autumn: ['#ba493c', '#e47938', '#f1ad43', '#f7ce77'],
-  winter: ['#a4b8ca', '#d4e4ed', '#f4f8fb', '#c5dbe4'],
+  // Winter: Deciduous trees shed all leaves in winter; muted dormant tones as fallback
+  winter: ['#6b7d72', '#5c6e63', '#4f6055', '#425247'],
 }
 
 function leafGeometry() {
@@ -78,6 +82,10 @@ export function createProceduralTree(scene: THREE.Scene, x: number, z: number, s
     const leaves = new THREE.InstancedMesh(leafGeo, leafMat, countPerBranch)
     leaves.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
     leaves.frustumCulled = false
+    for (let i = 0; i < countPerBranch; i++) {
+      leaves.setColorAt(i, new THREE.Color('#5eb85b'))
+    }
+    if (leaves.instanceColor) leaves.instanceColor.needsUpdate = true
     const positions: THREE.Vector3[] = []
     const hues: number[] = []
     for (let i = 0; i < countPerBranch; i++) {
@@ -95,6 +103,10 @@ export function createProceduralTree(scene: THREE.Scene, x: number, z: number, s
   const falls = new THREE.InstancedMesh(leafGeo, fallingMat, fallCount)
   falls.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
   falls.frustumCulled = false
+  for (let i = 0; i < fallCount; i++) {
+    falls.setColorAt(i, new THREE.Color('#ba493c'))
+  }
+  if (falls.instanceColor) falls.instanceColor.needsUpdate = true
   root.add(falls)
   const fallState = Array.from({ length: fallCount }, (_, i) => ({
     origin: canopy[Math.floor(random() * canopy.length)].clone(),
@@ -111,53 +123,73 @@ export function createProceduralTree(scene: THREE.Scene, x: number, z: number, s
     const paletteKey = Object.values(weights).map((v) => v.toFixed(2)).join(':')
     const winter = weights.winter
     const autumn = weights.autumn
-    const visibility = clamp(1 - winter * 0.88)
+
+    // Deciduous seasonal shedding:
+    // In winter, trees completely lose their leaves (visibility = 0).
+    // As late autumn transitions into winter, leaves shed progressively.
+    // In spring, tender young leaves emerge and grow into full summer canopy.
+    const winterShed = Math.min(1, Math.max(0, (winter - 0.1) / 0.45))
+    const visibility = clamp((1 - winterShed) * (1 - winter * 0.95))
     const wind = reduced ? 0 : 1
+
     for (const { group, phase, strength } of branchGroups) {
       group.rotation.z = wind * strength * (Math.sin(time * 0.8 + phase) + 0.38 * Math.sin(time * 1.9 + phase * 1.7))
       group.rotation.x = wind * strength * Math.sin(time * 1.1 + phase * 0.7)
     }
+
+    const isCanopyVisible = visibility > 0.001
     for (const { mesh, positions, hues } of leafSets) {
-      for (let i = 0; i < positions.length; i++) {
-        dummy.position.copy(positions[i])
-        dummy.rotation.set(wind * 0.11 * Math.sin(time * 2.5 + i), i * 2.4, wind * 0.15 * Math.sin(time * 2.1 + i * 0.65))
-        const size = (0.48 + (i % 7) * 0.055) * visibility
-        dummy.scale.set(size, size, size)
-        dummy.updateMatrix()
-        mesh.setMatrixAt(i, dummy.matrix)
-        if (paletteKey !== lastPalette) {
-          color.setRGB(0, 0, 0)
-          for (const season of Object.keys(weights) as Season[]) {
-            target.set(foliageColors[season][hues[i]])
-            color.r += target.r * weights[season]
-            color.g += target.g * weights[season]
-            color.b += target.b * weights[season]
+      mesh.visible = isCanopyVisible
+      if (isCanopyVisible) {
+        for (let i = 0; i < positions.length; i++) {
+          dummy.position.copy(positions[i])
+          dummy.rotation.set(wind * 0.11 * Math.sin(time * 2.5 + i), i * 2.4, wind * 0.15 * Math.sin(time * 2.1 + i * 0.65))
+          const size = (0.48 + (i % 7) * 0.055) * visibility
+          dummy.scale.set(size, size, size)
+          dummy.updateMatrix()
+          mesh.setMatrixAt(i, dummy.matrix)
+          if (paletteKey !== lastPalette) {
+            color.setRGB(0, 0, 0)
+            for (const season of Object.keys(weights) as Season[]) {
+              target.set(foliageColors[season][hues[i]])
+              color.r += target.r * weights[season]
+              color.g += target.g * weights[season]
+              color.b += target.b * weights[season]
+            }
+            mesh.setColorAt(i, color)
           }
-          mesh.setColorAt(i, color)
         }
+        mesh.instanceMatrix.needsUpdate = true
+        if (mesh.instanceColor && paletteKey !== lastPalette) mesh.instanceColor.needsUpdate = true
       }
-      mesh.instanceMatrix.needsUpdate = true
-      if (mesh.instanceColor && paletteKey !== lastPalette) mesh.instanceColor.needsUpdate = true
     }
     lastPalette = paletteKey
-    for (let i = 0; i < fallCount; i++) {
-      const state = fallState[i]
-      const cycle = (time * state.speed + state.phase) % 9
-      const active = (autumn + weights.spring * 0.55) * (reduced ? 0 : 1)
-      dummy.position.copy(state.origin)
-      dummy.position.y = Math.max(0.03, state.origin.y - cycle * 0.48)
-      dummy.position.x += Math.sin(cycle * 1.6 + state.spin) * state.sway + cycle * 0.12
-      dummy.position.z += Math.cos(cycle * 1.2 + state.spin) * state.sway * 0.55
-      dummy.rotation.set(cycle * 1.8 + state.spin, cycle * 1.3, cycle * 2.1)
-      const size = (cycle < 7 ? 0.4 : 0.4 * (9 - cycle) / 2) * active
-      dummy.scale.setScalar(Math.max(0.0001, size))
-      dummy.updateMatrix()
-      falls.setMatrixAt(i, dummy.matrix)
-      color.set(autumn >= weights.spring ? foliageColors.autumn[i % 4] : foliageColors.spring[i % 4])
-      falls.setColorAt(i, color)
+
+    // Falling leaves: active exclusively during autumn shedding.
+    // Completely silent / zero in summer, spring, and deep winter.
+    const autumnFall = Math.max(0, autumn * 1.5 - weights.summer * 0.4 - winter * 1.4)
+    const active = clamp(autumnFall) * (reduced ? 0 : 1)
+    falls.visible = active > 0.005
+
+    if (falls.visible) {
+      for (let i = 0; i < fallCount; i++) {
+        const state = fallState[i]
+        const cycle = (time * state.speed + state.phase) % 9
+        dummy.position.copy(state.origin)
+        dummy.position.y = Math.max(0.03, state.origin.y - cycle * 0.48)
+        dummy.position.x += Math.sin(cycle * 1.6 + state.spin) * state.sway + cycle * 0.12
+        dummy.position.z += Math.cos(cycle * 1.2 + state.spin) * state.sway * 0.55
+        dummy.rotation.set(cycle * 1.8 + state.spin, cycle * 1.3, cycle * 2.1)
+        const size = (cycle < 7 ? 0.4 : 0.4 * (9 - cycle) / 2) * active
+        dummy.scale.setScalar(Math.max(0.0001, size))
+        dummy.updateMatrix()
+        falls.setMatrixAt(i, dummy.matrix)
+        color.set(foliageColors.autumn[i % 4])
+        falls.setColorAt(i, color)
+      }
+      falls.instanceMatrix.needsUpdate = true
+      if (falls.instanceColor) falls.instanceColor.needsUpdate = true
     }
-    falls.instanceMatrix.needsUpdate = true
-    if (falls.instanceColor) falls.instanceColor.needsUpdate = true
   }
   return {
     update,
