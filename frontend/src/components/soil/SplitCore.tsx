@@ -26,6 +26,8 @@ export interface SplitScenario {
   id: string
   label: string
   isCurrent: boolean
+  /** The user's own sown crops, from lib/plan.ts. Not a bundle rotation. */
+  isPlan?: boolean
   soilCover: number[]
   bareDays: number
   bareDaysByPhase?: number[] | null
@@ -85,7 +87,7 @@ export default function SplitCore({
         <h2>Three futures for the same ground.</h2>
       </div>
 
-      <div className="split-grid">
+      <div className="split-grid" data-count={scenarios.length}>
         {scenarios.map((s, i) => {
           const living = livingCoverFor(s.soilCover, baseline, greenCover)
           const daysSaved = baselineBare - s.bareDays
@@ -95,11 +97,11 @@ export default function SplitCore({
               : null
 
           return (
-            <article key={s.id} className={`split-panel ${s.isCurrent ? 'is-current' : ''}`} data-selected={selectedId === (s.isCurrent ? null : s.id) ? 'true' : 'false'}>
+            <article key={s.id} className={`split-panel ${s.isCurrent ? 'is-current' : ''} ${s.isPlan ? 'is-plan' : ''}`} data-selected={!s.isPlan && selectedId === (s.isCurrent ? null : s.id) ? 'true' : 'false'}>
               <header>
                 <div className="split-panel-actions">
-                  <span className="split-tag">{s.isCurrent ? 'Today' : `Option ${i}`}</span>
-                  {onSelect && <button type="button" className="split-select" aria-pressed={selectedId === (s.isCurrent ? null : s.id)} onClick={() => onSelect(s.isCurrent ? null : s.id)}>{selectedId === (s.isCurrent ? null : s.id) ? 'On year wheel ✓' : 'View on year wheel →'}</button>}
+                  <span className="split-tag">{s.isPlan ? 'Your plan' : s.isCurrent ? 'Today' : `Option ${i}`}</span>
+                  {onSelect && !s.isPlan && <button type="button" className="split-select" aria-pressed={selectedId === (s.isCurrent ? null : s.id)} onClick={() => onSelect(s.isCurrent ? null : s.id)}>{selectedId === (s.isCurrent ? null : s.id) ? 'On year wheel ✓' : 'View on year wheel →'}</button>}
                 </div>
                 <h3>{s.label}</h3>
               </header>

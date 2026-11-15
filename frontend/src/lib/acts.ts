@@ -115,7 +115,7 @@ export function buildActs(input: ActInput): Act[] {
       line: covered
         ? 'No cover crop can establish in the gap this field has. The honest answer is to leave it alone.'
         : best
-          ? `${best.label}: ${best.bareDays} bare days, ${best.deltaPct.toFixed(0)}% less soil lost, $${best.seedCostUsdHa.toFixed(0)} a hectare.`
+          ? `${best.label}: ${best.bareDays} bare days, ${Math.abs(best.deltaPct).toFixed(0)}% less soil lost, $${best.seedCostUsdHa.toFixed(0)} a hectare.`
           : 'Compare the rotations side by side.',
       focus: 'split',
       anchor: 'split',

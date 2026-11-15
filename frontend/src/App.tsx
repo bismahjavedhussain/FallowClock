@@ -13,6 +13,9 @@ import FarmerGuide from './components/FarmerGuide'
 import FieldNotes from './components/FieldNotes'
 import SoilCutaway from './components/soil/SoilCutaway'
 import SplitCore from './components/soil/SplitCore'
+import SkipNarration from './components/SkipNarration'
+import { planScenario } from './lib/plan'
+import { syncDetails } from './lib/syncDetails'
 import RotationCompare from './components/RotationCompare'
 import SlideDeck from './components/SlideDeck'
 import PhaseToggle from './components/PhaseToggle'
@@ -366,8 +369,8 @@ export default function App() {
     setSelectedDoy(doy)
   }
 
-  const logDiary = (text: string) => {
-    setDiary((d) => [{ id: `${Date.now()}`, stamp: doyToDate(selectedDoy).label, text }, ...d].slice(0, 12))
+  const logDiary = (text: string, doy = selectedDoy) => {
+    setDiary((d) => [{ id: `${Date.now()}`, stamp: doyToDate(doy).label, text }, ...d].slice(0, 12))
     // Hold the pen for as long as the diary takes to type the line out
     // (22 ms a character), so sprite and text finish together.
     setWriting(true)
@@ -385,7 +388,7 @@ export default function App() {
     // reads the intermediate values, only CSS transitions do.
     stormTimers.current.push(window.setTimeout(() => setStorm(0.5), 2800))
     stormTimers.current.push(window.setTimeout(() => setStorm(0), 4400))
-    logDiary(`Ran the heaviest storm on record (day ${worstStormDoy}).`)
+    logDiary(`Ran the heaviest storm on record (${doyToDate(worstStormDoy).label}).`, worstStormDoy)
     setGuideEvent({
       type: 'denied',
       detail: `This is ${doyToDate(worstStormDoy).label} \u2014 the heaviest rain in the whole record. Watch the bare ground.`,
@@ -533,6 +536,7 @@ export default function App() {
           <span className="eyebrow">NASA Space Apps 2026 &middot; Field Shift</span>
           <h1>Fallow Clock</h1>
           <p>Find the hole in your year.</p>
+          <p className="enter-epigraph">Look down before you look up. The ground that feeds us is running out of cover.</p>
           <button
             type="button"
             className="enter-begin"
@@ -548,6 +552,7 @@ export default function App() {
             &#9654; Begin
           </button>
           <small>Narrated. Best with sound on.</small>
+          <small className="enter-credit">Built by team Moon Breaker</small>
         </div>
       </div>
     )}
@@ -613,6 +618,7 @@ export default function App() {
                   }))}
                   active={activePhase}
                   onChange={(k) => { playSwitch(); setActivePhase(k) }}
+                  locked={!!selected && !selected.is_current}
                 />
               )}
               <div className="dial-corner" ref={setDialCorner}>
@@ -622,7 +628,7 @@ export default function App() {
                   onClose={() => setLegendOpen(false)}
                 />
               </div>
-              <YearRing initialMode="3D" cornerSlot={dialCorner} showLegend={false} bareDaysOverride={shownBareDays} gapOverride={wheelGap} soilCover={shownCover} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} frostProb={clim.frost_prob} greenCover={clim.green_cover} residueCover={clim.residue_cover} compareCover={selected ? current.soil_cover : accepted.length ? baselineCover : undefined} highlightDoys={plantingDoys} selectedDoy={selectedDoy} onHoverDay={setHoveredDoy} onSelectDay={scrubTo} onActivateDay={(day) => draggingSpeciesId && placeCrop(day)} onModeChange={(m) => { playSwitch(); setMode(m) }} reducedMotion={reducedMotion} synthetic={bundle.provenance.is_synthetic} />
+              <YearRing initialMode="3D" cornerSlot={dialCorner} showLegend={false} bareDaysOverride={selected && phaseIndex < 0 ? selected.bare_days : shownBareDays} gapOverride={selected ? null : wheelGap} soilCover={shownCover} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} frostProb={clim.frost_prob} greenCover={clim.green_cover} residueCover={clim.residue_cover} compareCover={selected ? current.soil_cover : accepted.length ? baselineCover : undefined} highlightDoys={plantingDoys} selectedDoy={selectedDoy} onHoverDay={setHoveredDoy} onSelectDay={scrubTo} onActivateDay={(day) => draggingSpeciesId && placeCrop(day)} onModeChange={(m) => { playSwitch(); setMode(m) }} reducedMotion={reducedMotion} synthetic={bundle.provenance.is_synthetic} />
             </div>
             <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
             {lush > 0.02 && (
@@ -701,8 +707,15 @@ export default function App() {
         <SplitCore
           doy={selectedDoy}
           selectedId={selectedRotationId}
-          onSelect={(id) => { playSwitch(); selectRotation(id) }}
-          scenarios={bundle.rotations.map((r) => ({
+          onSelect={(id) => {
+            // The button says "view on year wheel", so go there. A rotation
+            // only exists as an average curve, so drop any crop-year view.
+            playSwitch()
+            selectRotation(id)
+            if (id) setActivePhase(null)
+            setSlide(0)
+          }}
+          scenarios={[...bundle.rotations.map((r) => ({
             id: r.id,
             label: r.label,
             isCurrent: r.is_current,
@@ -712,7 +725,10 @@ export default function App() {
             seedCostUsdHa: r.added_seed_cost_usd_ha,
             deltaPct: r.delta_vs_current_pct,
             nCreditKgHa: r.n_credit_kg_ha,
-          }))}
+          })),
+          // Whatever the user has sown (and the diary has logged) joins the
+          // comparison as a card of its own.
+          ...planScenario({ fits: accepted, baseCover: current.soil_cover, erosivity: clim.erosivity_r, nObs: clim.n_obs_per_doy, phaseCovers })]}
           greenCover={clim.green_cover}
           residueCover={clim.residue_cover}
           soilMoisture={clim.soil_moisture}
@@ -721,7 +737,7 @@ export default function App() {
           phaseLabels={phaseLabels}
           reducedMotion={reducedMotion}
         />
-        <div className="futures-detail-row">
+        <div className="futures-detail-row" ref={syncDetails}>
           <RotationCompare
             rotations={bundle.rotations.map((r) => ({ id: r.id, label: r.label, isCurrent: r.is_current, sequence: r.sequence }))}
             speciesNames={new Map(bundle.species.map((sp) => [sp.id, sp.name]))}
@@ -743,8 +759,19 @@ export default function App() {
 
     </SlideDeck>
 
-    {/* Act 2 is the farmer's desk, so that is where he walks to. */}
-    <FarmerGuide line={guide} reducedMotion={reducedMotion} walkTo={slide === 1 ? 0.34 : null} writing={writing} />
+    {/* He keeps to his bottom-left corner in every act. */}
+    <FarmerGuide line={guide} reducedMotion={reducedMotion} writing={writing} />
+    {!briefDone && (
+      <SkipNarration onSkip={() => {
+        // Same audio unlock as Begin, in case this is the first click.
+        setEngineSound(true)
+        useStore.getState().setSoundEnabled(true)
+        primeOnFirstGesture()
+        setEntered(true)
+        setIntroDone(true)
+        setBriefDone(true)
+      }} />
+    )}
     <FieldDiaryModal
       open={diaryOpen}
       onClose={() => setDiaryOpen(false)}

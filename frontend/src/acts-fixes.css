@@ -1,0 +1,61 @@
+/* Layout fixes for Acts two, three and four, plus the skip-narration button.
+   Kept in its own file, loaded after index.css, so it never collides with
+   edits to the header or Act one rules in index.css. */
+
+/* --- Act two: the farmer stays in his corner -------------------------- */
+/* The desk act enlarged him and walked him to the middle, where he covered
+   the act pills and the time lever. Here he is the same as in every other
+   act: same size, same lane. */
+.site-shell[data-act='desk'] .farmer-guide { width: var(--farmer-lane); height: var(--bottom-bar); align-items: flex-end; padding-bottom: 4px; }
+.site-shell[data-act='desk'] .farmer-sprite,
+.site-shell[data-act='desk'] .farmer-sprite img { width: 128px; height: 128px; }
+.site-shell[data-act='desk'] .farmer-shadow { bottom: 6px; width: 54px; margin-left: -27px; height: 7px; }
+.site-shell[data-act='desk'] .farmer-bubble { margin-bottom: 26px; }
+
+/* --- Act two: the field diary in the heading row ---------------------- */
+/* The tab and the "Open the field diary" link sat on one line with no gap,
+   and the open pages pushed the whole act down and crushed the chart. Now:
+   pages on the left as a short strip, tab and link stacked on the right. */
+.pane-desk .desk-head .farmer-diary.is-inline { display: grid; grid-template-columns: auto auto; grid-template-areas: 'pages open' 'pages tab'; column-gap: 14px; row-gap: 7px; align-items: start; justify-items: end; }
+.pane-desk .desk-head .diary-tab { grid-area: tab; white-space: nowrap; }
+.pane-desk .desk-head .diary-open-full { grid-area: open; margin: 0; white-space: nowrap; }
+.pane-desk .desk-head .diary-pages { grid-area: pages; width: min(440px, 34vw); min-height: 84px; max-height: 128px; margin: 0; padding: 12px 15px; border-radius: 6px; }
+.pane-desk .pane-grid { grid-template-rows: minmax(0, 1fr); }
+
+/* --- Act three: labels that ran into each other ----------------------- */
+/* "Water" rides the water line up the right edge and collided with "Roots"
+   whenever the soil was wet. Roots now sits on the left between Topsoil and
+   Subsoil, so the right edge belongs to the water label alone. */
+.soil-scene-labels .soil-scene-roots { top: 51%; left: 16px; right: auto; }
+/* "Residue" is placed by the component so it can never ride up into the
+   "Under the surface" heading; see SoilCutaway.tsx. */
+.soil-scene-labels .soil-scene-residue { transform: none; }
+/* The right-hand column was cut off on short screens instead of scrolling. */
+.pane-root .pane-grid { grid-template-rows: minmax(0, 1fr); }
+
+/* --- Act four --------------------------------------------------------- */
+/* Dark green on the dark page: unreadable. */
+.site-shell.is-deck .pane-futures .comparison-note { color: #bcd3c2; }
+.site-shell.is-deck .pane-futures .comparison-note strong { color: #e3f0e6; }
+/* A fourth card when the user has a plan of their own. */
+.pane-futures .split-grid[data-count='4'] { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.pane-futures .split-panel.is-plan { border-color: #d9b56a; background: #fffaf0; }
+.pane-futures .split-panel.is-plan .split-tag { background: #8a6a45; color: #fdf4e2; }
+.pane-futures .split-panel-actions { flex-wrap: wrap; }
+@media (max-width: 980px) {
+  .pane-futures .split-grid[data-count='4'] { grid-template-columns: 1fr; }
+}
+
+/* --- Skip narration --------------------------------------------------- */
+/* Above the title card (80), the descent (70) and the brief (68). */
+.skip-narration { position: fixed; right: 20px; bottom: 16px; z-index: 90; display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px; border: 1px solid #ffffff5c; border-radius: 999px; background: #0f2a1fd9; color: #eaf6ef; font: 600 12px/1 system-ui; letter-spacing: .02em; cursor: pointer; transition: background .18s, border-color .18s; }
+.skip-narration:hover { background: #17402f; border-color: #ffffff8a; }
+.skip-narration:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
+/* On small screens the brief's text box reaches the bottom corners. */
+@media (max-width: 900px), (max-height: 620px) {
+  .skip-narration { top: 12px; bottom: auto; right: 12px; }
+}
+
+/* --- Title card: epigraph and team credit ----------------------------- */
+.enter-card .enter-epigraph { margin: -14px 0 24px; color: #a9c8b3; font: 13px/1.5 Georgia, serif; font-style: italic; }
+.enter-card .enter-credit { margin-top: 18px; color: #7fa38b; letter-spacing: .14em; text-transform: uppercase; font-size: 10px; }

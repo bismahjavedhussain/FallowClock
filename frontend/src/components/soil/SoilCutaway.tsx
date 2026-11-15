@@ -263,7 +263,7 @@ export default function SoilCutaway({
 
       </svg>
       {!compact && <div className="soil-scene-labels" aria-hidden="true">
-        <span className="soil-scene-residue" style={{ top: `${((SURFACE_Y - matH) / H) * 100}%` }}>Residue {Math.round(residue * 100)}%</span>
+        <span className="soil-scene-residue" style={{ top: `max(calc(${(((SURFACE_Y - matH) / H) * 100).toFixed(2)}% - 26px), 66px)` }}>Residue {Math.round(residue * 100)}%</span>
         <span className="soil-scene-topsoil">Topsoil</span>
         <span className="soil-scene-roots">Roots · derived</span>
         <span className="soil-scene-subsoil">Subsoil</span>
