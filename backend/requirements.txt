@@ -1,15 +1,22 @@
-# Core contract + pipeline
+# The contract and the model
 pydantic>=2.9
 numpy>=1.26
-requests>=2.32
 scipy>=1.13
 
-# Earth Engine (primary EO route -- see plan bottleneck B1/B2)
-earthengine-api>=1.1.0
+# Sentinel-2 / Landsat chips for the intro (scripts/fetch_*_image.py only)
+pillow>=10.0
 
-# API
+# Optional local API -- the deployed site does not use it and serves
+# static bundles instead. See README, "Optional local API".
 fastapi>=0.115
 uvicorn[standard]>=0.30
 
 # Dev
 pytest>=8.0
+
+# HTTP goes through the standard library (urllib, wrapped by
+# fallowclock/cache.py), so there is no requests dependency.
+#
+# earthengine-api was dropped: Earth Engine needs a per-user account and
+# registration that is not instant, so the imagery pipeline moved to STAC
+# against Microsoft Planetary Computer. Nothing imports `ee` any more.
