@@ -97,7 +97,11 @@ export default function SplitCore({
               : null
 
           return (
-            <article key={s.id} className={`split-panel ${s.isCurrent ? 'is-current' : ''} ${s.isPlan ? 'is-plan' : ''}`} data-selected={!s.isPlan && selectedId === (s.isCurrent ? null : s.id) ? 'true' : 'false'}>
+            <article
+              key={s.id}
+              className={`split-panel ${s.isCurrent ? 'is-current' : ''} ${s.isPlan ? 'is-plan' : ''}`}
+              data-selected={selectedId === s.id || (s.isCurrent && !selectedId) ? 'true' : 'false'}
+            >
               <header>
                 <div className="split-panel-actions">
                   <span className="split-tag">{s.isPlan ? 'Your plan' : s.isCurrent ? 'Today' : `Option ${i}`}</span>
@@ -105,11 +109,11 @@ export default function SplitCore({
                     <button
                       type="button"
                       className="split-select"
-                      aria-pressed={!s.isPlan && selectedId === (s.isCurrent ? null : s.id)}
-                      onClick={() => onSelect(s.isPlan || s.isCurrent ? null : s.id)}
+                      aria-pressed={selectedId === s.id || (s.isCurrent && !selectedId)}
+                      onClick={() => onSelect(selectedId === s.id ? null : (s.isCurrent ? null : s.id))}
                     >
                       {s.isPlan
-                        ? 'View plan on wheel →'
+                        ? (selectedId === s.id ? 'On year wheel ✓' : 'View plan on wheel →')
                         : selectedId === (s.isCurrent ? null : s.id)
                         ? 'On year wheel ✓'
                         : 'View on year wheel →'}

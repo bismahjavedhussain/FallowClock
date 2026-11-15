@@ -753,7 +753,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
    hide information rather than tidy it. */
 .pane-side { overflow-y: auto; overscroll-behavior: contain; padding-right: 4px; }
 .pane-side > * { flex-shrink: 0; }
-.pane-main > .hero-world { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; }
+.pane-main > .hero-world { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; }
 .pane-main > .hero-world > [role='region'] { max-height: 100%; }
 .pane-main .soil-cutaway { flex: 1; min-height: 0; display: flex; align-items: center; }
 .pane-main .soil-cutaway svg { max-height: 100%; }
@@ -812,7 +812,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
    while allowing internal vertical scrolling within individual act panes so
    no interactive elements or data are ever clipped or trapped. */
 @media (max-width: 1023px) {
-  :root { --farmer-lane: 0px; --bottom-bar: 56px; }
+  :root { --farmer-lane: 0px; --bottom-bar: 0px; }
   .site-shell.is-deck { height: 100dvh; min-height: 100dvh; overflow: hidden; display: flex; flex-direction: column; }
   .deck { position: relative; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
   .deck-track { display: flex; flex: 1 1 auto; min-height: 0; width: 100%; will-change: transform; }
@@ -824,7 +824,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   .pane-futures .rotation-list { grid-template-columns: 1fr; }
 
   /* Act 1 Mobile Hierarchy:
-     1. Visualization (Wheel) with 2D/3D controls on top and reset/how-to pills below
+     1. Visualization (Wheel) with Phase bar on top, Candidate banner, 2D/3D controls, and reset/how-to pills below
      2. Cover Soil selected day box (.field-summary)
      3. Date Slider (.time-lever)
      4. Lush meter (if active)
@@ -834,6 +834,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
     display: flex;
     flex-direction: column;
     gap: 14px;
+    align-items: center;
   }
   .pane-crisis .pane-main,
   .pane-crisis .pane-side {
@@ -841,84 +842,117 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   }
   .pane-crisis .hero-world {
     order: 1;
-    margin-bottom: 2px;
+    margin: 0 auto 2px;
     width: 100%;
+    max-width: 620px;
   }
   .pane-crisis .field-summary {
     order: 2;
     width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
     position: static !important;
   }
   .pane-crisis .time-lever {
     order: 3;
     width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
   }
   .pane-crisis .lush-meter {
     order: 4;
     width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
   }
   .pane-crisis .farmer-thinking {
     order: 5;
     width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
   }
   .pane-crisis .crop-planner {
     order: 6;
     width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
   }
   .pane-crisis .placement-message {
     order: 7;
     width: 100%;
+    max-width: 620px;
+    margin: 0 auto;
   }
 
   /* Bottom Navigation Bar:
-     Uses natural flex flow below the slides so it NEVER overlaps screen content. */
+     In mobile & tablet view (< 1024px), navigation is moved into the hamburger menu. */
   .site-shell.is-deck .deck-nav {
-    position: relative !important;
-    left: auto !important;
-    right: auto !important;
-    bottom: auto !important;
-    flex: none !important;
-    z-index: 30;
-    height: var(--bottom-bar);
-    padding: 6px clamp(10px, 3vw, 20px) max(6px, env(safe-area-inset-bottom));
-    background: #061710ee;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    border-top: 1px solid var(--deck-edge);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-top: auto;
+    display: none !important;
   }
 
-  /* Scaled Little Dude:
-     Scaled down to 36x36px across tablet & mobile so the screen is unobscured. */
+  /* Little Dude (FarmerGuide):
+     Pulled down to the bottom, enlarged to ~50px sprite, with a full-width speech bubble. */
   .farmer-guide {
-    position: fixed;
-    left: 8px;
-    bottom: calc(var(--bottom-bar) + 8px);
-    z-index: 35;
-    width: auto;
-    height: auto;
+    position: fixed !important;
+    left: 12px !important;
+    right: 12px !important;
+    bottom: max(10px, env(safe-area-inset-bottom)) !important;
+    z-index: 45 !important;
+    width: calc(100vw - 24px) !important;
+    max-width: none !important;
+    height: auto !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: flex-end !important;
+    gap: 10px !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+  }
+  .farmer-guide > * {
+    pointer-events: auto !important;
   }
   .farmer-sprite,
   .farmer-sprite img,
   .site-shell[data-act='desk'] .farmer-sprite,
   .site-shell[data-act='desk'] .farmer-sprite img {
-    width: 36px !important;
-    height: 36px !important;
+    width: 50px !important;
+    height: 50px !important;
+    flex-shrink: 0 !important;
   }
   .farmer-shadow {
-    width: 24px !important;
+    width: 28px !important;
     height: 4px !important;
-    margin-left: -12px !important;
+    margin-left: -14px !important;
     bottom: 2px !important;
   }
   .farmer-bubble {
-    max-width: min(210px, calc(100vw - 64px)) !important;
+    position: relative !important;
+    flex: 1 1 auto !important;
+    width: auto !important;
+    max-width: none !important;
+    margin-bottom: 2px !important;
+    padding: 6px 28px 6px 12px !important;
+    border-width: 2px !important;
+    border-radius: 6px !important;
+    background: #fffdf2 !important;
+    box-shadow: 0 4px 16px #00000040 !important;
+  }
+  .farmer-bubble p {
     font-size: 11px !important;
-    padding: 7px 10px !important;
-    margin-bottom: 6px !important;
+    line-height: 1.35 !important;
+    display: block !important;
+    -webkit-line-clamp: unset !important;
+    overflow: visible !important;
+    margin: 0 !important;
+    color: #24351b !important;
+  }
+  .farmer-bubble-close {
+    top: 50% !important;
+    right: 6px !important;
+    transform: translateY(-50%) !important;
+    width: 18px !important;
+    height: 18px !important;
+    font-size: 13px !important;
   }
 }
 
@@ -1027,70 +1061,6 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 @keyframes next-nudge { 0%, 100% { transform: translateX(0) } 50% { transform: translateX(4px) } }
 
 @media (max-width: 1023px) {
-  .farmer-guide {
-    position: fixed;
-    left: 10px;
-    bottom: calc(var(--bottom-bar) + 10px);
-    width: auto;
-    height: auto;
-    z-index: 28;
-    display: flex;
-    flex-direction: row;
-    align-items: flex-end;
-    gap: 8px;
-    padding: 0;
-    pointer-events: none;
-  }
-  .farmer-guide > * {
-    pointer-events: auto;
-  }
-  .farmer-sprite, .farmer-sprite img {
-    width: 52px;
-    height: 52px;
-  }
-  .farmer-shadow {
-    bottom: 2px;
-    width: 26px;
-    height: 4px;
-    margin-left: -13px;
-  }
-  .farmer-bubble {
-    position: relative;
-    max-width: min(280px, calc(100vw - 84px));
-    margin-bottom: 6px;
-    padding: 6px 24px 6px 10px;
-    border-width: 2px;
-    border-radius: 6px;
-    background: #fffdf2;
-    box-shadow: 0 6px 18px #0000004d;
-  }
-  .farmer-bubble p {
-    font-size: 11.5px;
-    line-height: 1.35;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .farmer-bubble::before {
-    left: -7px;
-    right: auto;
-    bottom: 12px;
-    width: 8px;
-    height: 8px;
-    transform: rotate(45deg);
-    border-left: 2px solid #2f4435;
-    border-bottom: 2px solid #2f4435;
-    border-right: 0;
-    border-top: 0;
-  }
-  .farmer-bubble-close {
-    top: 3px;
-    right: 4px;
-    width: 16px;
-    height: 16px;
-    font-size: 13px;
-  }
   .deck-next {
     min-height: 38px;
     padding: 0 8px 0 14px;
@@ -1139,17 +1109,6 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   }
   .deck-next-label {
     font-size: 11px;
-  }
-  .farmer-guide {
-    left: 6px;
-    bottom: calc(var(--bottom-bar) + 6px);
-  }
-  .farmer-sprite, .farmer-sprite img {
-    width: 44px;
-    height: 44px;
-  }
-  .farmer-bubble {
-    max-width: min(230px, calc(100vw - 64px));
   }
 }
 
@@ -1425,13 +1384,45 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .pane-crisis .hero-world [role='region'] { width: 100%; max-height: 100%; }
 .pane-crisis .hero-world [role='region'] > div:last-child { max-height: 100%; }
 
-/* --- active candidate rotation banner in Act 1 ---------------------- */
+/* --- crop phase bar & active candidate rotation banner in Act 1 ----- */
+.hero-phase-bar {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  margin-bottom: 6px;
+  z-index: 20;
+  flex: none;
+}
+
+.phase-pills {
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  margin: 0 auto;
+  z-index: 20;
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 999px;
+  border: 1px solid #ffffff5c;
+  background: #0f2a1fb8;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.phase-pills button { min-height: 28px; padding: 0 13px; border: 0; border-radius: 999px; background: transparent; color: #dceadd; font: 600 11.5px/1 system-ui; letter-spacing: .02em; cursor: pointer; transition: background .18s, color .18s; }
+.phase-pills button:hover:not(:disabled) { background: #ffffff1f; }
+.phase-pills button[aria-pressed='true'] { background: #f3faf1; color: #1b5240; }
+.phase-pills button:disabled { opacity: .4; cursor: not-allowed; }
+.phase-pills button:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
+
 .rotation-preview-banner {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 8;
+  position: relative;
+  top: auto;
+  left: auto;
+  transform: none;
+  margin: 4px auto 8px;
+  z-index: 25;
   display: inline-flex;
   align-items: center;
   gap: 10px;
@@ -1446,6 +1437,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   animation: notes-fade .24s ease both;
+  flex: none;
 }
 .preview-tag {
   flex: none;
@@ -1494,13 +1486,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 
 @media (max-width: 600px) {
   .rotation-preview-banner {
-    top: 8px;
     width: calc(100% - 16px);
     max-width: none;
     border-radius: 12px;
     padding: 7px 10px;
     gap: 6px;
     flex-wrap: wrap;
+    margin: 4px auto 6px;
   }
   .preview-label {
     width: 100%;
@@ -1512,14 +1504,6 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
     margin-left: auto;
   }
 }
-
-/* --- phase pills, sitting on the dial -------------------------------- */
-.phase-pills { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 6; display: flex; gap: 4px; padding: 4px; border-radius: 999px; border: 1px solid #ffffff5c; background: #0f2a1fb8; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
-.phase-pills button { min-height: 28px; padding: 0 13px; border: 0; border-radius: 999px; background: transparent; color: #dceadd; font: 600 11.5px/1 system-ui; letter-spacing: .02em; cursor: pointer; transition: background .18s, color .18s; }
-.phase-pills button:hover:not(:disabled) { background: #ffffff1f; }
-.phase-pills button[aria-pressed='true'] { background: #f3faf1; color: #1b5240; }
-.phase-pills button:disabled { opacity: .4; cursor: not-allowed; }
-.phase-pills button:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
 
 /* --- "we gotcha, farmer" ---------------------------------------------- */
 .legend-ask { display: inline-flex; align-items: center; gap: 9px; width: 100%; min-height: 40px; padding: 0 14px; border: 1px dashed #a8c0a4; border-radius: 13px; background: #f6faf0; color: #3c5547; font: 600 12px/1.3 system-ui; text-align: left; cursor: pointer; transition: background .18s, border-color .18s; }
@@ -1611,6 +1595,11 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   gap: 8px;
   flex: none;
 }
+.topbar-audio-tablet {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 .topbar-hamburger {
   display: none;
   align-items: center;
@@ -1637,6 +1626,16 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   font-size: 15px;
   color: #f0cf87;
   line-height: 1;
+}
+
+/* Tablet view: Sound & Narration sit to the left of the menu icon */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .topbar-audio-tablet {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    margin-right: 4px !important;
+  }
 }
 
 @media (max-width: 1023px) {
@@ -1666,6 +1665,13 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   }
   .brand span small {
     display: none;
+  }
+}
+
+/* Mobile view (< 768px): Hide audio controls from topbar (they live inside hamburger menu) */
+@media (max-width: 767px) {
+  .topbar-audio-tablet {
+    display: none !important;
   }
 }
 
@@ -1801,6 +1807,92 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
   color: #fffdf5;
   font: 700 10px system-ui;
 }
+
+/* Acts Navigation in Mobile Menu */
+.mobile-acts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.mobile-act-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid #c3ceb8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #2f4e3c;
+  font: 600 12.5px system-ui;
+  cursor: pointer;
+  text-align: left;
+  transition: all .16s ease;
+}
+.mobile-act-btn:hover {
+  background: #f7f9f4;
+}
+.mobile-act-btn.is-active {
+  background: #2f6b52;
+  border-color: #2f6b52;
+  color: #f7faf3;
+  box-shadow: 0 4px 12px #2f6b5233;
+}
+.mobile-act-num {
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  opacity: .8;
+  margin-right: 8px;
+}
+.mobile-act-label {
+  flex: 1;
+}
+.mobile-act-current {
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 99px;
+  background: #f0cf87;
+  color: #24351b;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+/* Sound & Narration Controls in Mobile Menu */
+.mobile-audio-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #d4c8b0;
+  border-radius: 10px;
+  background: #f9f5e9;
+}
+.mobile-audio-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font: 600 12px system-ui;
+  color: #2f4e3c;
+}
+.mobile-sound-toggle-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid #2f6b52;
+  border-radius: 999px;
+  background: #2f6b52;
+  color: #ffffff;
+  font: 600 11.5px/1 system-ui;
+  cursor: pointer;
+  transition: background .16s, border-color .16s;
+}
+.mobile-sound-toggle-btn[aria-pressed='false'] {
+  background: #ffffff;
+  color: #55695e;
+  border-color: #a8b8ae;
+}
 .mobile-menu-foot {
   margin-top: auto;
   padding-top: 20px;
@@ -1881,7 +1973,7 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
    you open once and close, so the frequent control is the nearer one.
    The portal appends the reset pill after the legend trigger, so `order`
    states the stacking rather than relying on DOM insertion. */
-.dial-corner { position: absolute; right: 12px; bottom: 12px; z-index: 7; display: flex; flex-direction: column; align-items: flex-end; gap: 9px; }
+.dial-corner { position: absolute; right: 12px; bottom: 12px; z-index: 15; display: flex; flex-direction: column; align-items: flex-end; gap: 9px; }
 /* Inside the stack the pills are flow items; on their own (YearRing3D used
    standalone, as the tests do) they keep the absolute corner placement the
    base .dial-pill rule gives them. */
@@ -1890,29 +1982,34 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .ring-reset { order: 1; }
 .legend-ask { order: 2; }
 
-@media (max-width: 900px), (max-height: 620px) {
+@media (max-width: 1023px) {
   .dial-corner {
-    position: static;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: stretch;
-    gap: 8px;
-    margin-top: 10px;
-    width: 100%;
+    position: relative !important;
+    right: auto !important;
+    bottom: auto !important;
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    margin-top: 8px !important;
+    margin-bottom: 4px !important;
+    width: 100% !important;
+    z-index: 15 !important;
   }
   .dial-corner > .dial-pill {
-    flex: 1;
-    width: auto;
-    min-height: 38px;
-    justify-content: center;
-    font-size: 11.5px;
-    padding: 0 10px;
+    flex: 1 1 0 !important;
+    width: auto !important;
+    max-width: 240px !important;
+    min-height: 38px !important;
+    justify-content: center !important;
+    font-size: 11.5px !important;
+    padding: 0 10px !important;
   }
   .legend-ask {
-    position: static;
-    width: auto;
-    justify-content: center;
+    position: static !important;
+    width: auto !important;
+    justify-content: center !important;
   }
 }
 
@@ -2474,6 +2571,9 @@ li[data-moved='no'] .shift-change { color: #6b7d6e; font-weight: 500; }
     margin: 0 auto;
     width: 100%;
     box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
   }
   .year-ring-stage {
     height: clamp(320px, 48vh, 480px);

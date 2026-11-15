@@ -128,3 +128,92 @@ describe('ResponsiveLayout - Act 2 Single Farmer Diary CTA', () => {
     expect(html).toContain('class="diary-cta-arrow"')
   })
 })
+
+describe('ResponsiveLayout - Mobile Menu Navigation & Audio Controls', () => {
+  it('renders mobile menu acts navigation and audio controls markup', () => {
+    const html = renderToStaticMarkup(
+      <nav className="topbar-mobile-menu" aria-label="Mobile navigation">
+        <div className="mobile-menu-section mobile-acts-section">
+          <span className="mobile-section-label">Jump to Act</span>
+          <div className="mobile-acts-list">
+            <button type="button" className="mobile-act-btn is-active">
+              <span className="mobile-act-num">Act 1</span>
+              <span className="mobile-act-label">The crisis</span>
+              <span className="mobile-act-current">Active</span>
+            </button>
+          </div>
+        </div>
+        <div className="mobile-menu-section mobile-audio-section">
+          <span className="mobile-section-label">Sound &amp; Narration</span>
+          <div className="mobile-audio-controls">
+            <div className="mobile-audio-row">
+              <span className="mobile-audio-label">Voice Narration</span>
+            </div>
+            <div className="mobile-audio-row">
+              <span className="mobile-audio-label">Atmospheric Sound</span>
+              <button type="button" className="mobile-sound-toggle-btn">Sound On 🔊</button>
+            </div>
+          </div>
+        </div>
+      </nav>
+    )
+
+    expect(html).toContain('class="mobile-menu-section mobile-acts-section"')
+    expect(html).toContain('class="mobile-act-btn is-active"')
+    expect(html).toContain('Act 1')
+    expect(html).toContain('The crisis')
+    expect(html).toContain('class="mobile-menu-section mobile-audio-section"')
+    expect(html).toContain('Voice Narration')
+    expect(html).toContain('Atmospheric Sound')
+    expect(html).toContain('Sound On 🔊')
+  })
+})
+
+describe('ResponsiveLayout - SplitCore Plan Candidate Selection', () => {
+  it('supports selecting and viewing user plan on year wheel', async () => {
+    const { default: SplitCore } = await import('./soil/SplitCore')
+    const sampleCover = new Array(365).fill(0.5)
+    const onSelect = vi.fn()
+
+    const html = renderToStaticMarkup(
+      <SplitCore
+        doy={180}
+        scenarios={[
+          {
+            id: 'current',
+            label: 'Current Rotation',
+            isCurrent: true,
+            soilCover: sampleCover,
+            bareDays: 104,
+            seedCostUsdHa: 0,
+            deltaPct: 0,
+            nCreditKgHa: 0,
+          },
+          {
+            id: 'your-plan',
+            label: 'Your plan: Cereal rye',
+            isCurrent: false,
+            isPlan: true,
+            soilCover: sampleCover,
+            bareDays: 62,
+            seedCostUsdHa: 45,
+            deltaPct: -40,
+            nCreditKgHa: 30,
+          },
+        ]}
+        selectedId="your-plan"
+        onSelect={onSelect}
+        greenCover={sampleCover}
+        residueCover={sampleCover}
+        soilMoisture={sampleCover}
+        erosivity={sampleCover}
+        nObs={new Array(365).fill(5)}
+      />
+    )
+
+    expect(html).toContain('split-panel')
+    expect(html).toContain('is-plan')
+    expect(html).toContain('data-selected="true"')
+    expect(html).toContain('On year wheel ✓')
+  })
+})

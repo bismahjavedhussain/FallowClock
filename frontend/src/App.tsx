@@ -15,7 +15,7 @@ import SoilCutaway from './components/soil/SoilCutaway'
 import SplitCore from './components/soil/SplitCore'
 import SkipNarration from './components/SkipNarration'
 import NarrationToggle from './components/NarrationToggle'
-import { planScenario } from './lib/plan'
+import { planScenario, PLAN_ID } from './lib/plan'
 import { syncDetails } from './lib/syncDetails'
 import RotationCompare from './components/RotationCompare'
 import SlideDeck from './components/SlideDeck'
@@ -109,7 +109,23 @@ const FALLBACK_URL = '/bundles/farm_synthetic.json'
 export default function App() {
   const [bundle, setBundle] = useState<Bundle | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const { selectedRotationId, selectRotation, setHoveredDoy, selectedDoy, setSelectedDoy, draggingSpeciesId, setDraggingSpecies, placedFills, addPlacedFill, removePlacedFill, resetPlacedFills, reducedMotion, setReducedMotion } = useStore()
+  const {
+    selectedRotationId,
+    selectRotation,
+    setHoveredDoy,
+    selectedDoy,
+    setSelectedDoy,
+    draggingSpeciesId,
+    setDraggingSpecies,
+    placedFills,
+    addPlacedFill,
+    removePlacedFill,
+    resetPlacedFills,
+    reducedMotion,
+    setReducedMotion,
+    soundEnabled,
+    setSoundEnabled,
+  } = useStore()
   const [mode, setMode] = useState<'2D' | '3D'>('3D')
   const [farmId, setFarmId] = useState<string>(FARMS[0].id)
   const [notesOpen, setNotesOpen] = useState(false)
@@ -221,8 +237,6 @@ export default function App() {
 
   const clim = bundle?.climatology
   const current = bundle?.rotations.find((r) => r.is_current)
-  const selected =
-    bundle?.rotations.find((r) => r.id === selectedRotationId) ?? null
 
   // Nothing can be drilled into a field that still has a crop standing on
   // it. The backend already gates its own fit on the observed harvest; the
@@ -287,6 +301,44 @@ export default function App() {
   const pickedFit = draggingSpeciesId ? fitById.get(draggingSpeciesId) : undefined
   const plantingDoys = useMemo(() => pickedFit?.feasible && bundle?.gaps[0] && bundle.species.find((s) => s.id === pickedFit.speciesId)
     ? candidateSeedDoys(bundle.species.find((s) => s.id === pickedFit.speciesId)!, bundle.gaps[0], PRE_GAP_SEEDING_DAYS, earliestSeedDoy) : [], [pickedFit, bundle, earliestSeedDoy])
+
+  const accepted = useMemo(
+    () => placedFills.map((id) => fitById.get(id)).filter((fit) => fit?.feasible && fit.coverCurve.length === 365),
+    [placedFills, fitById],
+  )
+
+  const planCandidate = useMemo(() => {
+    if (!current || !clim) return null
+    const plans = planScenario({
+      fits: accepted,
+      baseCover: current.soil_cover,
+      erosivity: clim.erosivity_r,
+      nObs: clim.n_obs_per_doy,
+      phaseCovers,
+    })
+    if (!plans.length) return null
+    const p = plans[0]
+    return {
+      id: p.id,
+      label: p.label,
+      is_current: false,
+      soil_cover: p.soilCover,
+      bare_days: p.bareDays,
+      bare_days_by_phase: p.bareDaysByPhase,
+      added_seed_cost_usd_ha: p.seedCostUsdHa,
+      delta_vs_current_pct: p.deltaPct,
+      n_credit_kg_ha: p.nCreditKgHa,
+      sequence: [],
+    }
+  }, [current, clim, accepted, phaseCovers])
+
+  const selected = useMemo(
+    () =>
+      selectedRotationId === PLAN_ID
+        ? planCandidate
+        : bundle?.rotations.find((r) => r.id === selectedRotationId) ?? null,
+    [selectedRotationId, planCandidate, bundle],
+  )
 
   if (error) {
     return (
@@ -410,7 +462,6 @@ export default function App() {
   const phaseBase = phaseIndex >= 0 && phaseCovers ? phaseCovers[phaseIndex] : null
 
   const baselineCover = selected?.soil_cover ?? current.soil_cover
-  const accepted = placedFills.map((id) => fitById.get(id)).filter((fit) => fit?.feasible && fit.coverCurve.length === 365)
 
   // The figures in the seeding panel are averaged over the real rotation
   // phases, never read off the mean curve -- see the Jensen note on
@@ -534,10 +585,13 @@ export default function App() {
       <div className="farm-switch" role="group" aria-label="Choose a field">{FARMS.map((f) => <button type="button" key={f.id} onClick={() => { playSwitch(); setFarmId(f.id) }} aria-pressed={farmId === f.id} className={farmId === f.id ? 'is-active' : ''}>{f.label}</button>)}</div>
       <button type="button" className="notes-trigger" onClick={() => { playSwitch(); setNotesOpen(true) }} aria-haspopup="dialog">Field notes <span>{bundle.uncertainty.length}</span></button>
       <div className="topbar-actions">
-        <NarrationToggle onStopNarration={() => {
-          setIntroDone(true)
-          setBriefDone(true)
-        }} />
+        <div className="topbar-audio-tablet">
+          <NarrationToggle onStopNarration={() => {
+            setIntroDone(true)
+            setBriefDone(true)
+          }} />
+          <AudioAtmosphere doy={selectedDoy} />
+        </div>
         <button
           type="button"
           className="topbar-hamburger"
@@ -549,7 +603,6 @@ export default function App() {
           <span className="hamburger-label">{mobileMenuOpen ? 'Close' : 'Menu'}</span>
         </button>
       </div>
-      <AudioAtmosphere doy={selectedDoy} />
     </header>
 
     {mobileMenuOpen && (
@@ -557,7 +610,7 @@ export default function App() {
         <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
         <nav className="topbar-mobile-menu" aria-label="Mobile navigation">
           <div className="mobile-menu-head">
-            <span className="eyebrow">Location &amp; Controls</span>
+            <span className="eyebrow">Menu &amp; Navigation</span>
             <button
               type="button"
               className="mobile-menu-close"
@@ -567,6 +620,60 @@ export default function App() {
               &times;
             </button>
           </div>
+
+          {/* Acts Navigation for Mobile & Tablet */}
+          <div className="mobile-menu-section mobile-acts-section">
+            <span className="mobile-section-label">Jump to Act</span>
+            <div className="mobile-acts-list">
+              {SLIDES.map((s, i) => (
+                <button
+                  type="button"
+                  key={s.id}
+                  onClick={() => {
+                    playSwitch()
+                    setSlide(i)
+                    setMobileMenuOpen(false)
+                  }}
+                  className={`mobile-act-btn ${slide === i ? 'is-active' : ''}`}
+                >
+                  <span className="mobile-act-num">Act {i + 1}</span>
+                  <span className="mobile-act-label">{s.label}</span>
+                  {slide === i && <span className="mobile-act-current" aria-hidden="true">Active</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Sound & Narration Controls for Mobile */}
+          <div className="mobile-menu-section mobile-audio-section">
+            <span className="mobile-section-label">Sound &amp; Narration</span>
+            <div className="mobile-audio-controls">
+              <div className="mobile-audio-row">
+                <span className="mobile-audio-label">Voice Narration</span>
+                <NarrationToggle onStopNarration={() => {
+                  setIntroDone(true)
+                  setBriefDone(true)
+                }} />
+              </div>
+              <div className="mobile-audio-row">
+                <span className="mobile-audio-label">Atmospheric Sound</span>
+                <button
+                  type="button"
+                  className="mobile-sound-toggle-btn"
+                  aria-pressed={soundEnabled}
+                  onClick={() => {
+                    playSwitch()
+                    const next = !soundEnabled
+                    setEngineSound(next)
+                    setSoundEnabled(next)
+                  }}
+                >
+                  {soundEnabled ? 'Sound On 🔊' : 'Sound Off 🔇'}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <div className="mobile-menu-section">
             <span className="mobile-section-label">Select Field</span>
             <div className="mobile-farm-switch">
@@ -697,20 +804,22 @@ export default function App() {
             }}>
               <Suspense fallback={null}><SeasonalWorld doy={selectedDoy} storm={storm} /></Suspense>
               {phaseCovers && phaseLabels && phaseCovers.length === phaseLabels.length && current.bare_days_by_phase && (
-                <PhaseToggle
-                  phases={phaseLabels.map((label, i) => ({
-                    key: label,
-                    label: label.charAt(0).toUpperCase() + label.slice(1),
-                    days: current.bare_days_by_phase![i],
-                  }))}
-                  active={activePhase}
-                  onChange={(k) => { playSwitch(); setActivePhase(k) }}
-                  locked={!!selected && !selected.is_current}
-                />
+                <div className="hero-phase-bar">
+                  <PhaseToggle
+                    phases={phaseLabels.map((label, i) => ({
+                      key: label,
+                      label: label.charAt(0).toUpperCase() + label.slice(1),
+                      days: current.bare_days_by_phase![i],
+                    }))}
+                    active={activePhase}
+                    onChange={(k) => { playSwitch(); setActivePhase(k) }}
+                    locked={!!selected && !selected.is_current}
+                  />
+                </div>
               )}
               {selected && !selected.is_current && (
                 <div className="rotation-preview-banner" role="status">
-                  <span className="preview-tag">Candidate</span>
+                  <span className="preview-tag">{selected.id === PLAN_ID ? 'Your Plan' : 'Candidate'}</span>
                   <span className="preview-label">
                     <strong>{selected.label}</strong>: {selected.bare_days} bare days ({selected.delta_vs_current_pct > 0 ? '+' : ''}{selected.delta_vs_current_pct.toFixed(0)}% vs baseline)
                   </span>
@@ -724,6 +833,7 @@ export default function App() {
                   </button>
                 </div>
               )}
+              <YearRing initialMode="3D" cornerSlot={dialCorner} showLegend={false} bareDaysOverride={selected && phaseIndex < 0 ? selected.bare_days : shownBareDays} gapOverride={selected ? null : wheelGap} soilCover={shownCover} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} frostProb={clim.frost_prob} greenCover={clim.green_cover} residueCover={clim.residue_cover} compareCover={selected ? current.soil_cover : accepted.length ? baselineCover : undefined} highlightDoys={plantingDoys} selectedDoy={selectedDoy} onHoverDay={setHoveredDoy} onSelectDay={scrubTo} onActivateDay={(day) => draggingSpeciesId && placeCrop(day)} onModeChange={(m) => { playSwitch(); setMode(m) }} reducedMotion={reducedMotion} synthetic={bundle.provenance.is_synthetic} />
               <div className="dial-corner" ref={setDialCorner}>
                 <LegendFlyout
                   open={legendOpen}
@@ -731,7 +841,6 @@ export default function App() {
                   onClose={() => setLegendOpen(false)}
                 />
               </div>
-              <YearRing initialMode="3D" cornerSlot={dialCorner} showLegend={false} bareDaysOverride={selected && phaseIndex < 0 ? selected.bare_days : shownBareDays} gapOverride={selected ? null : wheelGap} soilCover={shownCover} erosivity={clim.erosivity_r} nObs={clim.n_obs_per_doy} frostProb={clim.frost_prob} greenCover={clim.green_cover} residueCover={clim.residue_cover} compareCover={selected ? current.soil_cover : accepted.length ? baselineCover : undefined} highlightDoys={plantingDoys} selectedDoy={selectedDoy} onHoverDay={setHoveredDoy} onSelectDay={scrubTo} onActivateDay={(day) => draggingSpeciesId && placeCrop(day)} onModeChange={(m) => { playSwitch(); setMode(m) }} reducedMotion={reducedMotion} synthetic={bundle.provenance.is_synthetic} />
             </div>
             <TimeLever doy={selectedDoy} onChange={setSelectedDoy} />
             {lush > 0.02 && (
