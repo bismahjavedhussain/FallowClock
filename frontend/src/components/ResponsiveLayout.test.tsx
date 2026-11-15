@@ -217,3 +217,53 @@ describe('ResponsiveLayout - SplitCore Plan Candidate Selection', () => {
     expect(html).toContain('On year wheel ✓')
   })
 })
+
+describe('ResponsiveLayout - Hero World 2D & 3D Visualization Stages', () => {
+  it('renders 2D stage with SVG and controls in proper document structure', async () => {
+    const { default: YearRing } = await import('./YearRing')
+    const sampleCover = new Array(365).fill(0.5)
+    const sampleErosivity = new Array(365).fill(10)
+    const sampleNObs = new Array(365).fill(5)
+    const sampleFrost = new Array(365).fill(0.1)
+
+    const html = renderToStaticMarkup(
+      <YearRing
+        initialMode="2D"
+        soilCover={sampleCover}
+        erosivity={sampleErosivity}
+        nObs={sampleNObs}
+        frostProb={sampleFrost}
+        selectedDoy={180}
+      />
+    )
+
+    expect(html).toContain('class="year-ring-root')
+    expect(html).toContain('class="year-ring-controls')
+    expect(html).toContain('2D View')
+    expect(html).toContain('3D View')
+    expect(html).toContain('class="year-ring-stage year-ring-stage-2d')
+    expect(html).toContain('viewBox="0 0 620 620"')
+  })
+
+  it('renders 3D stage fallback container in static markup', async () => {
+    const { default: YearRing } = await import('./YearRing')
+    const sampleCover = new Array(365).fill(0.5)
+    const sampleErosivity = new Array(365).fill(10)
+    const sampleNObs = new Array(365).fill(5)
+    const sampleFrost = new Array(365).fill(0.1)
+
+    const html = renderToStaticMarkup(
+      <YearRing
+        initialMode="3D"
+        soilCover={sampleCover}
+        erosivity={sampleErosivity}
+        nObs={sampleNObs}
+        frostProb={sampleFrost}
+        selectedDoy={180}
+      />
+    )
+
+    expect(html).toContain('class="year-ring-root')
+    expect(html).toContain('class="year-ring-stage year-ring-stage-3d')
+  })
+})

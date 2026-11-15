@@ -380,7 +380,11 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
   const handlePointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (event.target !== canvasRef.current) return
     dragRef.current = { active: true, moved: false, x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY }
-    event.currentTarget.setPointerCapture(event.pointerId)
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId)
+    } catch {
+      // Pointer capture fallback for mobile browsers
+    }
   }, [])
   const handlePointerMove = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current
@@ -406,7 +410,13 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
     const drag = dragRef.current
     if (!drag.active) return
     drag.active = false
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId)
+      }
+    } catch {
+      // Ignore
+    }
     if (!drag.moved) {
       const doy = pickDay(event.clientX, event.clientY)
       if (doy) { onSelectDay?.(doy); onActivateDay?.(doy) }
@@ -414,7 +424,13 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
   }, [pickDay, onSelectDay, onActivateDay])
   const handlePointerCancel = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     dragRef.current.active = false
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    try {
+      if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+        event.currentTarget.releasePointerCapture(event.pointerId)
+      }
+    } catch {
+      // Ignore
+    }
   }, [])
 
   const resetButton = (
@@ -431,29 +447,28 @@ export default function YearRing3D({ soilCover, erosivity, nObs, compareCover, h
 
   if (!webglSupported) return <div className="flex h-full flex-col items-center justify-center p-8 text-center text-ink-soft"><p className="font-semibold text-risk-high">3D graphics are unavailable in this browser.</p><p className="mt-1 text-sm">Use the 2D Year Ring to continue.</p></div>
   return <div ref={containerRef} className="relative h-full w-full overflow-hidden rounded-xl border border-black/10 bg-paper" style={{ touchAction: 'none' }} onPointerDown={handlePointerDown} onPointerMove={handlePointerMove} onPointerUp={handlePointerUp} onPointerCancel={handlePointerCancel} onLostPointerCapture={() => { dragRef.current.active = false }} onPointerLeave={() => { if (!dragRef.current.active && lastHoverRef.current !== null) { lastHoverRef.current = null; onHoverDay?.(null) } }} onDragOver={(event) => {
-      event.preventDefault()
-      // Say the drop is allowed, so the cursor stops showing "no entry".
-      event.dataTransfer.dropEffect = 'copy'
-    }} onDrop={(event) => {
-      event.preventDefault()
-      const raw = pickDay(event.clientX, event.clientY, true)
-      // DAYS_IN_RING as the snap radius means no limit -- the largest
-      // circular distance is half a year. The lit band is on screen and
-      // the user is holding the seed; refusing the drop at this point
-      // teaches nothing and just loses the gesture.
-      const doy = snapToNearestDay(raw, highlightSet.size ? highlightSet : null, DAYS_IN_RING) ?? raw
-      if (doy) {
-        // Only swallow the event once it has actually been handled. A
-        // drop we cannot resolve must bubble to the field panel, which
-        // plants on the suggested date rather than losing the drag.
-        event.stopPropagation()
-        onSelectDay?.(doy)
-        onActivateDay?.(doy)
-      }
-    }} role="region" aria-label="3D Year Ring Interactive Calendar">
+    event.preventDefault()
+    // Say the drop is allowed, so the cursor stops showing "no entry".
+    event.dataTransfer.dropEffect = 'copy'
+  }} onDrop={(event) => {
+    event.preventDefault()
+    const raw = pickDay(event.clientX, event.clientY, true)
+    // DAYS_IN_RING as the snap radius means no limit -- the largest
+    // circular distance is half a year. The lit band is on screen and
+    // the user is holding the seed; refusing the drop at this point
+    // teaches nothing and just loses the gesture.
+    const doy = snapToNearestDay(raw, highlightSet.size ? highlightSet : null, DAYS_IN_RING) ?? raw
+    if (doy) {
+      // Only swallow the event once it has actually been handled. A
+      // drop we cannot resolve must bubble to the field panel, which
+      // plants on the suggested date rather than losing the drag.
+      event.stopPropagation()
+      onSelectDay?.(doy)
+      onActivateDay?.(doy)
+    }
+  }} role="region" aria-label="3D Year Ring Interactive Calendar">
     <canvas ref={canvasRef} className="block h-full w-full cursor-grab active:cursor-grabbing" />
     {/* Bottom-left: top-left is the day tooltip, top-centre the phase pills, bottom-right Reset camera. */}
-    <div className="pointer-events-none absolute bottom-3 left-3 max-w-[48%] rounded-md bg-white/85 px-2 py-1 text-[11px] font-medium text-ink-soft backdrop-blur">Drag to orbit · scroll to zoom · click a day</div>
     {cornerSlot ? createPortal(resetButton, cornerSlot) : resetButton}
   </div>
 }
