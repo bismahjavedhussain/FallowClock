@@ -1254,11 +1254,11 @@ button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3
 .act-head p { margin: 0; color: #5a6b5c; font: 13px/1.45 system-ui; }
 .pane-crisis .act-head { display: none; }
 
-/* --- the sound switch ------------------------------------------------- */
-.sound-toggle { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid #ffffff3d; border-radius: 50%; background: #ffffff1a; color: #eaf6ef; cursor: pointer; transition: background .18s, color .18s, border-color .18s; }
-.sound-toggle:hover { background: #ffffff33; border-color: #ffffff6b; }
-.sound-toggle[aria-pressed='false'] { color: #9ab5a4; background: transparent; }
-.sound-toggle:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
+/* --- the sound & narration switches --------------------------------- */
+.sound-toggle, .narration-toggle { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border: 1px solid #ffffff3d; border-radius: 50%; background: #ffffff1a; color: #eaf6ef; cursor: pointer; transition: background .18s, color .18s, border-color .18s; }
+.sound-toggle:hover, .narration-toggle:hover { background: #ffffff33; border-color: #ffffff6b; }
+.sound-toggle[aria-pressed='false'], .narration-toggle[aria-pressed='false'] { color: #9ab5a4; background: transparent; }
+.sound-toggle:focus-visible, .narration-toggle:focus-visible { outline: 2px solid #f0cf87; outline-offset: 2px; }
 
 /* The brand shrinks to a seal once the title needs the room. */
 @media (max-width: 1080px) {
@@ -1683,7 +1683,7 @@ body { background: var(--deck-bg); }
 .site-shell.is-deck .farm-switch { margin-top: 0; align-self: center; }
 .site-shell.is-deck .farm-switch button { min-height: 30px; }
 .site-shell.is-deck .notes-trigger { min-height: 36px; align-self: center; }
-.site-shell.is-deck .sound-toggle { align-self: center; }
+.site-shell.is-deck .sound-toggle, .site-shell.is-deck .narration-toggle { align-self: center; }
 
 
 /* --- carrying a seed -------------------------------------------------- */

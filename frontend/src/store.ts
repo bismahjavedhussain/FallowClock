@@ -7,6 +7,26 @@
  */
 import { create } from 'zustand'
 
+function getInitialStorage(key: string, defaultVal: boolean): boolean {
+  if (typeof window === 'undefined') return defaultVal
+  try {
+    const val = localStorage.getItem(key)
+    if (val === null) return defaultVal
+    return val === 'true'
+  } catch {
+    return defaultVal
+  }
+}
+
+function setStorage(key: string, val: boolean): void {
+  if (typeof window === 'undefined') return
+  try {
+    localStorage.setItem(key, String(val))
+  } catch {
+    // Ignore storage quota or access errors
+  }
+}
+
 export interface AppState {
   bundle: unknown | null
   bundleError: string | null
@@ -19,6 +39,8 @@ export interface AppState {
   reducedMotion: boolean
   /** One switch for ambience AND interaction sound. The header owns it. */
   soundEnabled: boolean
+  /** Global switch for spoken voiceover and cinematic descent narration. */
+  narrationEnabled: boolean
   /**
    * Which part of the experience is playing, so the audio bed can differ.
    * 'intro' is narration only -- music under a voiceover competes with it
@@ -39,6 +61,7 @@ export interface AppState {
   resetPlacedFills: () => void
   setReducedMotion: (reduced: boolean) => void
   setSoundEnabled: (on: boolean) => void
+  setNarrationEnabled: (on: boolean) => void
   setAudioStage: (s: 'intro' | 'brief' | 'tool') => void
   setRusleB: (b: number) => void
 }
@@ -52,7 +75,8 @@ export const useStore = create<AppState>((set) => ({
   selectedDoy: 274,
   placedFills: [],
   reducedMotion: false,
-  soundEnabled: true,
+  soundEnabled: getInitialStorage('fallowclock_sound_enabled', true),
+  narrationEnabled: getInitialStorage('fallowclock_narration_enabled', true),
   audioStage: 'intro',
   rusleB: 0.035,
 
@@ -66,7 +90,14 @@ export const useStore = create<AppState>((set) => ({
   removePlacedFill: (id) => set((s) => ({ placedFills: s.placedFills.filter((x) => x !== id) })),
   resetPlacedFills: () => set({ placedFills: [] }),
   setReducedMotion: (reducedMotion) => set({ reducedMotion }),
-  setSoundEnabled: (soundEnabled) => set({ soundEnabled }),
+  setSoundEnabled: (soundEnabled) => {
+    setStorage('fallowclock_sound_enabled', soundEnabled)
+    set({ soundEnabled })
+  },
+  setNarrationEnabled: (narrationEnabled) => {
+    setStorage('fallowclock_narration_enabled', narrationEnabled)
+    set({ narrationEnabled })
+  },
   setAudioStage: (audioStage) => set({ audioStage }),
   setRusleB: (rusleB) => set({ rusleB }),
 }))

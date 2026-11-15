@@ -13,10 +13,9 @@ export default function AudioAtmosphere({ doy }: { doy: number }) {
   // wonder why clicks still make noise.
   const enabled = useStore((s) => s.soundEnabled)
   const stage = useStore((s) => s.audioStage)
-  // Narration owns the opening. Music under a voiceover is the fastest
-  // way to make the voice unintelligible, so the bed stays silent until
-  // the brief, comes in faded under the typing, and opens up in the tool.
-  const bed = stage === 'intro' ? 0 : stage === 'brief' ? 0.38 : 1
+  // Narration owns the opening focus, but a gentle atmospheric bed
+  // ensures the world is alive from the start when sound is on.
+  const bed = stage === 'intro' ? 0.25 : stage === 'brief' ? 0.45 : 1
   const setEnabled = (next: boolean | ((v: boolean) => boolean)) => {
     const value = typeof next === 'function' ? next(useStore.getState().soundEnabled) : next
     setEngineSound(value)
@@ -47,31 +46,55 @@ export default function AudioAtmosphere({ doy }: { doy: number }) {
     const leaves = new Audio(`/audio/leaves.${ambienceFormat}`)
     let index = 0
     music.src = `/audio/${tracks[index]}.${format}`
-    music.preload = 'none'
+    music.preload = 'auto'
     music.addEventListener('ended', () => {
       index = (index + 1) % tracks.length
       music.src = `/audio/${tracks[index]}.${format}`
       if (players.current && target.current.music > 0) void music.play().catch(() => {})
     })
     whoosh.src = `/audio/whoosh.${format}`
-    whoosh.preload = 'none'
+    whoosh.preload = 'auto'
     whoosh.volume = 0.13
     wind.loop = leaves.loop = true
     wind.volume = leaves.volume = music.volume = 0
     wind.preload = leaves.preload = 'auto'
     players.current = { wind, leaves, music, whoosh }
-    // If the streamed ambience cannot start -- offline, slow first load, a
-    // codec the browser refuses -- do NOT switch sound off. The interaction
-    // sounds are synthesised and need no files, so they still work, and
-    // killing them because a 1 MB mp3 stalled would be the wrong trade.
+    // If the streamed ambience cannot start immediately due to browser autoplay,
+    // the user gesture listener below retries seamlessly on first touch.
     void wind.play().catch(() => {})
     void leaves.play().catch(() => {})
-  }, [enabled])
+    if (musicEnabled) void music.play().catch(() => {})
+  }, [enabled, musicEnabled])
+
+  // Resume or start audio elements on first user gesture if autoplay policy blocked initial load
+  useEffect(() => {
+    const onUserGesture = () => {
+      if (players.current && enabled) {
+        void players.current.wind.play().catch(() => {})
+        void players.current.leaves.play().catch(() => {})
+        if (musicEnabled) void players.current.music.play().catch(() => {})
+      }
+      window.removeEventListener('pointerdown', onUserGesture)
+      window.removeEventListener('keydown', onUserGesture)
+      window.removeEventListener('touchstart', onUserGesture)
+      window.removeEventListener('click', onUserGesture)
+    }
+    window.addEventListener('pointerdown', onUserGesture, { passive: true })
+    window.addEventListener('keydown', onUserGesture)
+    window.addEventListener('touchstart', onUserGesture, { passive: true })
+    window.addEventListener('click', onUserGesture)
+    return () => {
+      window.removeEventListener('pointerdown', onUserGesture)
+      window.removeEventListener('keydown', onUserGesture)
+      window.removeEventListener('touchstart', onUserGesture)
+      window.removeEventListener('click', onUserGesture)
+    }
+  }, [enabled, musicEnabled])
 
   useEffect(() => {
     const player = players.current?.music
     if (!player) return
-    if (enabled && musicEnabled) void player.play().catch(() => setMusicEnabled(false))
+    if (enabled && musicEnabled) void player.play().catch(() => {})
     else if (!musicEnabled) player.pause()
   }, [enabled, musicEnabled])
 

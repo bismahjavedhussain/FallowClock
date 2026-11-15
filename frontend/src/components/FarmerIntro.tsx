@@ -93,12 +93,16 @@ export default function FarmerIntro({
 
   // Walk in, then wave, then start talking.
   useEffect(() => {
+    if (!useStore.getState().narrationEnabled) {
+      onDone()
+      return
+    }
     if (reducedMotion || !active) return
     const t = timers.current
     t.push(window.setTimeout(() => setStage('waving'), 2400))
     t.push(window.setTimeout(() => setStage('talking'), 3800))
     return clearTimers
-  }, [reducedMotion, active])
+  }, [reducedMotion, active, onDone])
 
   /**
    * The stage machine must always arrive at 'talking'.

@@ -181,4 +181,27 @@ describe('one script at a time', () => {
     expect(spoken.map((s) => s.text)).toEqual(['One.'])
     expect(ended).toBe(0)
   })
+
+  it('suppresses speech when narrationEnabled is false and fires onEnd immediately', async () => {
+    const { spoken, tick } = withChain()
+    const { speak, speakScript } = await fresh()
+    const { useStore } = await import('../store')
+
+    useStore.getState().setNarrationEnabled(false)
+
+    // speak is a no-op
+    speak('Do not speak this.')
+    expect(spoken.length).toBe(0)
+
+    // speakScript finishes immediately without speaking
+    let ended = 0
+    speakScript([{ text: 'Ignored line.' }], { onEnd: () => { ended += 1 } })
+    await tick()
+
+    expect(spoken.length).toBe(0)
+    expect(ended).toBe(1)
+
+    // Restore for other tests
+    useStore.getState().setNarrationEnabled(true)
+  })
 })

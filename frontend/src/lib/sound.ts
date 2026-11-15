@@ -70,10 +70,16 @@ export function primeOnFirstGesture(): void {
     window.removeEventListener('pointerdown', wake)
     window.removeEventListener('keydown', wake)
     window.removeEventListener('touchstart', wake)
+    window.removeEventListener('click', wake)
   }
   window.addEventListener('pointerdown', wake, { once: true, passive: true })
   window.addEventListener('keydown', wake, { once: true })
   window.addEventListener('touchstart', wake, { once: true, passive: true })
+  window.addEventListener('click', wake, { once: true })
+}
+
+if (typeof window !== 'undefined') {
+  primeOnFirstGesture()
 }
 
 /** Call from a click handler. Returns whether audio is actually usable. */

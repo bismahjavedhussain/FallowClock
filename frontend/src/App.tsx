@@ -14,6 +14,7 @@ import FieldNotes from './components/FieldNotes'
 import SoilCutaway from './components/soil/SoilCutaway'
 import SplitCore from './components/soil/SplitCore'
 import SkipNarration from './components/SkipNarration'
+import NarrationToggle from './components/NarrationToggle'
 import { planScenario } from './lib/plan'
 import { syncDetails } from './lib/syncDetails'
 import RotationCompare from './components/RotationCompare'
@@ -190,8 +191,14 @@ export default function App() {
 
   useEffect(() => {
     setGuideEvent({ type: 'farm', nonce: Date.now() })
-    setIntroDone(false)
-    setBriefDone(false)
+    const narrationOn = useStore.getState().narrationEnabled
+    if (narrationOn) {
+      setIntroDone(false)
+      setBriefDone(false)
+    } else {
+      setIntroDone(true)
+      setBriefDone(true)
+    }
     setSlide(0)
     setActivePhase(null)
     // The session belongs to the field it happened on. Without this, a
@@ -526,6 +533,10 @@ export default function App() {
       <h1 className="topbar-title">{slide === 0 ? <>Find the <em>hole</em> in your year.</> : actCopy.title}</h1>
       <div className="farm-switch" role="group" aria-label="Choose a field">{FARMS.map((f) => <button type="button" key={f.id} onClick={() => { playSwitch(); setFarmId(f.id) }} aria-pressed={farmId === f.id} className={farmId === f.id ? 'is-active' : ''}>{f.label}</button>)}</div>
       <button type="button" className="notes-trigger" onClick={() => { playSwitch(); setNotesOpen(true) }} aria-haspopup="dialog">Field notes <span>{bundle.uncertainty.length}</span></button>
+      <NarrationToggle onStopNarration={() => {
+        setIntroDone(true)
+        setBriefDone(true)
+      }} />
       <AudioAtmosphere doy={selectedDoy} />
     </header>
 
@@ -547,6 +558,10 @@ export default function App() {
               useStore.getState().setSoundEnabled(true)
               primeOnFirstGesture()
               setEntered(true)
+              if (!useStore.getState().narrationEnabled) {
+                setIntroDone(true)
+                setBriefDone(true)
+              }
             }}
           >
             &#9654; Begin

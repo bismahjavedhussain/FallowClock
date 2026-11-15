@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { introNarrationParts } from '../lib/acts'
 
 import { cancelSpeech, speakScript } from '../lib/speech'
+import { useStore } from '../store'
 
 export interface FieldChip {
   date: string
@@ -116,7 +117,7 @@ export default function SatelliteIntro({
 
   useEffect(() => {
     if (!chip || !ready) return
-    if (reducedMotion) {
+    if (reducedMotion || !useStore.getState().narrationEnabled) {
       onDone()
       return
     }

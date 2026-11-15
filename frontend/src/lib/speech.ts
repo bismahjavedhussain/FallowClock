@@ -14,7 +14,13 @@
  * carries the same words, so nothing is only available in audio.
  */
 
+import { useStore } from '../store'
+
 let warmed = false
+
+export function isNarrationEnabled(): boolean {
+  return useStore.getState().narrationEnabled
+}
 
 /** Voices load asynchronously on Chrome; the first call often returns []. */
 function pickVoice(): SpeechSynthesisVoice | null {
@@ -60,7 +66,7 @@ export function speak(
   text: string,
   { rate = 0.95, pitch = 1.0, volume = 0.95 } = {},
 ): void {
-  if (!speechAvailable() || !text) return
+  if (!speechAvailable() || !text || !useStore.getState().narrationEnabled) return
   const synth = window.speechSynthesis
   try {
     synth.cancel()
@@ -160,7 +166,7 @@ export function speakScript(
     onEnd?: () => void
   } = {},
 ): void {
-  if (!speechAvailable() || !parts.length) {
+  if (!speechAvailable() || !parts.length || !useStore.getState().narrationEnabled) {
     onEnd?.()
     return
   }
@@ -171,7 +177,7 @@ export function speakScript(
   const next = () => {
     // Superseded by a later call, or cancelled outright. Say nothing more
     // and do not fire onEnd: the run that replaced this one owns that.
-    if (generation !== scriptGeneration) return
+    if (generation !== scriptGeneration || !useStore.getState().narrationEnabled) return
     if (i >= parts.length) {
       onEnd?.()
       return
